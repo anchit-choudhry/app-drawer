@@ -21,11 +21,11 @@ name: "Microsoft Defender For Devops"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
-    - cron: '36 5 * * 2'
+    - cron: "36 5 * * 2"
 
 jobs:
   MSDO:
