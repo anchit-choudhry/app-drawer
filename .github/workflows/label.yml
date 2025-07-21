@@ -1,3 +1,4 @@
+---
 # This workflow will triage pull requests and apply a label based on the
 # paths that are modified in the pull request.
 #
@@ -17,6 +18,6 @@ jobs:
       pull-requests: write
 
     steps:
-    - uses: actions/labeler@v4
-      with:
-        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+      - uses: actions/labeler@v4
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
