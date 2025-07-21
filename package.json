@@ -1,0 +1,19 @@
+{
+  "name": "app-drawer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "main": "index.js",
+  "keywords": [],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start:express-static-serve": "pm2 start packages/express-static-serve/server.js --time -i 0",
+    "stop:express-static-serve": "pm2 stop packages/express-static-serve/server.js",
+    "logs:express-static-serve": "pm2 logs"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

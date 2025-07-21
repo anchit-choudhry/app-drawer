@@ -1,0 +1,19 @@
+{
+  "name": "express-static-serve",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-static-gzip": "^3.0.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "pm2": "^6.0.8"
+  }
+}
