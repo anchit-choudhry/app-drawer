@@ -11,13 +11,9 @@ max_line_length = 100
 trim_trailing_whitespace = true
 
 [*.md]
-max_line_length = off
 trim_trailing_whitespace = false
 
-[*.yml]
-max_line_length = off
-
-[package.json]
+[*.{md,yml,package.json}]
 max_line_length = off
 
 [COMMIT_EDITMSG]
