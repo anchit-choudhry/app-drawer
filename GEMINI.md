@@ -27,6 +27,7 @@ app-drawer/
 │       ├── package.json
 │       └── views/               # EJS templates for 404/500 error pages
 ├── package.json                 # Root workspace configuration
+├── .claude/                     # Claude Code hooks, agents, and skills for this repository
 └── .github/                     # CI/CD workflows and Dependabot config
 ```
 
@@ -40,8 +41,8 @@ This package serves static assets from a `dist/` directory (expected to be popul
   directory is expected to be populated externally as there is currently no build step in this
   repository.
 - **Compression Negotiation Order:** Zstandard → Brotli → Gzip → Deflate.
-- **Caching:** Public cache with 2-hour client `max-age`, 4-hour proxy `s-maxage`, and
-  `must-revalidate`.
+- **Caching:** Public cache with 2-hour client `max-age`, 4-hour proxy `s-maxage`,
+  `must-revalidate`, and `proxy-revalidate`.
 - **Middleware Order:** Helmet (security headers) → Morgan (logging) → routes → static files.
 - **Security:** Implements Helmet for secure headers.
 - **Health Check:** `GET /` returns `{ status: "UP" }`.
@@ -98,12 +99,6 @@ cd packages/express-static-serve && node server.js
 - **Module System:** CommonJS (`require`/`module.exports`).
 - **Typography:** **NEVER** use en dashes (–) or em dashes (—). Use only standard hyphens (-).
 
-### Commit Style
-
-- **Commit Safety:** Do not create commits automatically; only commit when explicitly instructed.
-- **Commit Messages:** Use participles in commit messages (e.g., "Adding", "Fixing", "Updating").
-- **Dashes:** Do not use en or em dashes in commit messages.
-
 ### Security & Maintenance
 
 - **Vulnerability Scanning:** Regularly run `npm audit`.
@@ -115,5 +110,4 @@ cd packages/express-static-serve && node server.js
 
 - [ ] Implement EJS error handling in `server.js` using the templates in `views/`.
 - [ ] Add unit and integration tests (currently no tests specified).
-- [ ] Define a build process for populating the `dist/` directory. for populating the `dist/`
-  directory.
+- [ ] Define a build process for populating the `dist/` directory.

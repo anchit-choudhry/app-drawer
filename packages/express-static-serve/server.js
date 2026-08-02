@@ -18,9 +18,6 @@ function setCustomCacheControl(res, file) {
   );
 }
 
-// Middleware to serve static files from 'dist' directory
-// app.use(express.static(path.join(__dirname, 'dist')));
-
 app.use(helmet());
 app.use(morgan("combined"));
 

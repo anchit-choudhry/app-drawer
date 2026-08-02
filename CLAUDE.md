@@ -23,6 +23,7 @@ app-drawer/
 │       ├── package.json
 │       └── views/               # EJS templates for 404/500 error pages
 ├── package.json                 # Root workspace config
+├── .claude/                     # Claude Code hooks, agents, and skills for this repository
 └── .github/                     # CI/CD workflows and Dependabot config
 ```
 
@@ -68,6 +69,10 @@ externally.
 - **Fixing Vulnerabilities:** Use `npm audit fix`. Avoid `--force` to prevent breaking changes.
 - **CI/CD:** Automated security scans (CodeQL, DevSkim, njsscan, OSSAR, OSV Scanner) run on every
   push.
+- **Lockfile integrity:** If `package-lock.json` is missing `resolved`/`integrity` fields, `npm
+  install` alone won't fix it while `node_modules` still exists - remove both first.
+- **Linting scope:** `super-linter` runs with `VALIDATE_ALL_CODEBASE: false`, but still lints the
+  full content of any changed file, not just changed lines.
 
 ## Coding and Commit Style Guidelines
 
@@ -88,7 +93,6 @@ When working within this repository, adhere to the following style and commit ru
   Formatted code" is acceptable.
 - **Documentation and Commit Messages:** Never use en dashes (–) or em dashes (—) in documentation
   or commit messages.
-- **Dashes:** Do not use en or em dashes in commit messages.
 
 ## AI/Agent Guidelines
 
@@ -102,3 +106,10 @@ invariants:
   external APIs).
 * **Security:** Prioritize writing safe, secure, and correct code, avoiding common OWASP Top 10
   vulnerabilities.
+
+## Claude Code Tooling Notes
+
+- Hook commands in `.claude/settings.json` can use `$CLAUDE_PROJECT_DIR` to reference the repository
+  root - no need for a `git rev-parse --show-toplevel` wrapper.
+- `GET /` is the health check route and does not go through `setCustomCacheControl`. Verify
+  Cache-Control/compression headers by requesting an actual file under `dist/`, not `/`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Blocks edits to .env / .env.local (gitignored, contain real secrets).
+# Blocks edits to any .env* file (gitignored, contain real secrets).
 # .env.example is intentionally allowed.
 set -euo pipefail
 
@@ -11,7 +11,7 @@ print(d.get('file_path', ''))
 
 BASENAME=$(basename -- "$FILE_PATH")
 
-if [[ "$BASENAME" == ".env" || "$BASENAME" == ".env.local" ]]; then
+if [[ "$BASENAME" == .env* && "$BASENAME" != ".env.example" ]]; then
   echo "BLOCKED: '$FILE_PATH' is gitignored and contains real secrets."
   echo "Edit .env.example instead, then copy to .env manually."
   exit 2
