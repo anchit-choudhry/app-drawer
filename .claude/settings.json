@@ -35,11 +35,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && cd \"$root\" && bash .claude/hooks/block-env-edit.sh'"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-env-edit.sh\""
           },
           {
             "type": "command",
-            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && cd \"$root\" && bash .claude/hooks/warn-core-files.sh'"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/warn-core-files.sh\""
           }
         ]
       },
@@ -48,11 +48,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && cd \"$root\" && bash .claude/hooks/block-dangerous-git.sh'"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-dangerous-git.sh\""
           },
           {
             "type": "command",
-            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && bash \"$root/.claude/hooks/block-rm-outside-repo.sh\"'"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-rm-outside-repo.sh\""
           }
         ]
       }

@@ -19,7 +19,7 @@ multiple utility and service applications, currently focusing on optimized stati
 
 The project follows a monorepo structure using npm workspaces located in the `packages/` directory.
 
-```
+```text
 app-drawer/
 ├── packages/
 │   └── express-static-serve/    # Specialized Express server
@@ -37,7 +37,8 @@ This package serves static assets from a `dist/` directory (expected to be popul
 - **Port:** 3000
 - **Module System:** CommonJS (`type: "commonjs"`)
 - **Static Assets:** Served from `dist/` (must be pre-built) via `express-static-gzip`. The `dist/`
-  directory is expected to be populated externally as there is currently no build step in this repo.
+  directory is expected to be populated externally as there is currently no build step in this
+  repository.
 - **Compression Negotiation Order:** Zstandard → Brotli → Gzip → Deflate.
 - **Caching:** Public cache with 2-hour client `max-age`, 4-hour proxy `s-maxage`, and
   `must-revalidate`.

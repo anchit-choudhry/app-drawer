@@ -13,8 +13,8 @@ if [[ -z "$COMMAND" ]]; then
   exit 0
 fi
 
-if printf '%s\n' "$COMMAND" | grep -qE "git push.*(--force|-f).*(main|master)" || \
-   printf '%s\n' "$COMMAND" | grep -qE "git push.*(main|master).*(--force|-f)"; then
+if printf '%s\n' "$COMMAND" | grep -qE "git push.*(--force|-f).*(main|master)" ||
+  printf '%s\n' "$COMMAND" | grep -qE "git push.*(main|master).*(--force|-f)"; then
   echo "BLOCKED: Force push to main/master is not allowed."
   echo "Use a feature branch and open a PR instead."
   exit 2

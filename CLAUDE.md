@@ -15,7 +15,7 @@ compression negotiation and security headers.
 
 Uses npm workspaces (`packages/*`):
 
-```
+```text
 app-drawer/
 ├── packages/
 │   └── express-static-serve/    # Express server package
@@ -57,7 +57,7 @@ cd packages/express-static-serve && node server.js
 ```
 
 The server requires a `dist/` directory inside `packages/express-static-serve/` to serve static
-files. There is currently no build step in this repo; `dist/` is expected to be populated
+files. There is currently no build step in this repository; `dist/` is expected to be populated
 externally.
 
 ## CI/CD

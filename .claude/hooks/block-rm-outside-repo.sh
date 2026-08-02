@@ -61,6 +61,6 @@ fi
 echo "BLOCKED: rm target resolves outside the project directory ($REPO_ROOT)."
 while IFS=$'\t' read -r tok target; do
   echo "  '$tok' -> $target"
-done <<< "$RESULT"
+done <<<"$RESULT"
 echo "Offending command: $COMMAND"
 exit 2
