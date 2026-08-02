@@ -33,6 +33,10 @@ app.use(
   "/",
   expressStaticGzip(path.join(__dirname, "dist"), {
     enableBrotli: true,
+    customCompressions: [
+      { encodingName: "zstd", fileExtension: "zst" },
+      { encodingName: "deflate", fileExtension: "zz" },
+    ],
     serveStatic: {
       setHeaders: setCustomCacheControl,
     },

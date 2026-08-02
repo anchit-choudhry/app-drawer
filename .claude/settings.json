@@ -1,0 +1,61 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C * diff *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * status*)",
+      "Bash(git branch -d *)",
+      "Bash(git diff *)",
+      "Bash(git fetch*)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git status*)",
+      "Bash(npm audit*)",
+      "Bash(npm ls*)",
+      "Bash(npm outdated*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run start:express-static-serve*)",
+      "Bash(npm run stop:express-static-serve*)",
+      "Bash(npm run logs:express-static-serve*)",
+      "Bash(npm test*)"
+    ],
+    "deny": [
+      "Bash(npm install --global *)",
+      "Bash(npm install -g *)",
+      "Bash(npm add -g *)",
+      "Bash(sudo rm *)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && cd \"$root\" && bash .claude/hooks/block-env-edit.sh'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && cd \"$root\" && bash .claude/hooks/warn-core-files.sh'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && cd \"$root\" && bash .claude/hooks/block-dangerous-git.sh'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && bash \"$root/.claude/hooks/block-rm-outside-repo.sh\"'"
+          }
+        ]
+      }
+    ]
+  }
+}

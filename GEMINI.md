@@ -114,5 +114,5 @@ cd packages/express-static-serve && node server.js
 
 - [ ] Implement EJS error handling in `server.js` using the templates in `views/`.
 - [ ] Add unit and integration tests (currently no tests specified).
-- [ ] Define a build process for populating the `dist/` directory.
-  for populating the `dist/` directory.
+- [ ] Define a build process for populating the `dist/` directory. for populating the `dist/`
+  directory.

@@ -30,9 +30,12 @@ app-drawer/
 
 - **Port:** 3000
 - **Modules:** CommonJS (`type: "commonjs"`)
-- **Static assets:** Served from `dist/` (must be pre-built) via `express-static-gzip`
+- **Static assets:** Served from `dist/` (must be pre-built) via `express-static-gzip`. Pre-compressed
+  variants are matched by file extension: `.zst` (Zstandard), `.br` (Brotli), `.gz` (Gzip), `.zz`
+  (Deflate). Uncompressed files are served as-is if no matching variant exists.
 - **Compression negotiation order:** Zstandard → Brotli → Gzip → Deflate
-- **Cache-Control:** Public, 2-hour client max-age, 4-hour proxy s-maxage, must-revalidate
+- **Cache-Control:** Public, 2-hour client max-age, 4-hour proxy s-maxage, must-revalidate,
+  proxy-revalidate
 - **Middleware order:** Helmet (security headers) → Morgan (logging) → routes → static files
 - **Health check:** `GET /` returns `{ status: "UP" }`
 - **Process manager:** PM2 in cluster mode, auto-scales to CPU count (`-i 0`)
