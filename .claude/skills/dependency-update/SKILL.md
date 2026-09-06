@@ -17,14 +17,14 @@ into a repeatable process. Covers the npm workspace as a whole - there is only o
 1. **Check for updates**: Run `npm outdated` from the repository root.
 2. **User review**: Present the outdated packages (current, wanted, latest) to the user.
 3. **Selection**: Ask the user which packages to update and which to skip. Do not upgrade major
-    versions without explicit confirmation, since a major bump can break the Express 5 /
-    express-static-gzip / Helmet integration.
+   versions without explicit confirmation, since a major bump can break the Express 5 /
+   express-static-gzip / Helmet integration.
 4. **Apply updates**: Run `npm update <package1> <package2> ...` for the selected packages (scoped
-    to the correct workspace if the package isn't at the root).
+   to the correct workspace if the package isn't at the root).
 5. **Audit**: Run `npm audit`. If vulnerabilities remain, run `npm audit fix` - never
-    `npm audit fix --force`, per CLAUDE.md.
+   `npm audit fix --force`, per CLAUDE.md.
 6. **Verify**: Start the server locally (`cd packages/express-static-serve && node server.js`)
-    and confirm `GET /` returns `{ "status": "UP" }` before considering the update complete.
+   and confirm `GET /` returns `{ "status": "UP" }` before considering the update complete.
 
 ## Commands
 
