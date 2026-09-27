@@ -43,7 +43,8 @@ This package serves static assets from a `dist/` directory (expected to be popul
 - **Compression Negotiation Order:** Zstandard → Brotli → Gzip → Deflate.
 - **Caching:** Public cache with 2-hour client `max-age`, 4-hour proxy `s-maxage`,
   `must-revalidate`, and `proxy-revalidate`.
-- **Middleware Order:** Helmet (security headers) → Morgan (logging) → routes → static files.
+- **Middleware Order:** Helmet (security headers) → Morgan (logging) → routes → static files → 404
+  handler → error handler.
 - **Security:** Implements Helmet for secure headers.
 - **Health Check:** `GET /` returns `{ status: "UP" }`.
 - **Process Management:** PM2 in cluster mode, auto-scales to CPU count (`-i 0`).
@@ -84,7 +85,7 @@ cd packages/express-static-serve && node server.js
 #### Invariants for AI Agents
 
 - **Middleware Order:** Always maintain the prescribed middleware order: Helmet → Morgan → routes →
-  static files.
+  static files → 404 handler → error handler.
 - **Configuration:** Never introduce undocumented configuration changes or bypass security checks.
 - **Process:** Trust the framework's guarantees, only validating at system boundaries (user input,
   external APIs).
@@ -103,11 +104,11 @@ cd packages/express-static-serve && node server.js
 
 - **Vulnerability Scanning:** Regularly run `npm audit`.
 - **Fixing Vulnerabilities:** Use `npm audit fix`. Avoid `--force` to prevent breaking changes.
-- **CI/CD:** Automated security scans (CodeQL, DevSkim, njsscan, OSSAR, OSV Scanner) run on every
-  push.
+- **CI/CD:** Automated security scans (CodeQL, DevSkim, njsscan, OSSAR, OSV Scanner, Defender for
+  DevOps) run on push to `main`, on pull requests targeting `main`, and on a weekly schedule.
+  Dependency Review runs on pull requests targeting `main` only.
+- **Dependabot:** `.github/dependabot.yml` opens npm update PRs on a weekly schedule.
 
 ### TODO / Future Improvements
 
-- [ ] Implement EJS error handling in `server.js` using the templates in `views/`.
-- [ ] Add unit and integration tests (currently no tests specified).
 - [ ] Define a build process for populating the `dist/` directory.

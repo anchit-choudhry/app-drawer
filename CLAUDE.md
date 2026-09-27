@@ -85,10 +85,17 @@ npm test --workspace=express-static-serve
 
 - **Vulnerability Scanning:** Regularly run `npm audit`.
 - **Fixing Vulnerabilities:** Use `npm audit fix`. Avoid `--force` to prevent breaking changes.
-- **CI/CD:** Automated security scans (CodeQL, DevSkim, njsscan, OSSAR, OSV Scanner) run on every
-  push.
+- **CI/CD:** Automated security scans (CodeQL, DevSkim, njsscan, OSSAR, OSV Scanner, Defender for
+  DevOps) run on push to `main`, on pull requests targeting `main`, and on a weekly schedule.
+  Dependency Review runs on pull requests targeting `main` only.
+- **Dependabot:** `.github/dependabot.yml` opens npm update PRs on a weekly schedule.
 - **Lockfile integrity:** If `package-lock.json` is missing `resolved`/`integrity` fields, `npm
   install` alone won't fix it while `node_modules` still exists - remove both first.
+- **Transitive vulnerability overrides:** The root `package.json` pins `js-yaml` to `4.3.2` via
+  `overrides` because `pm2` pins an exact vulnerable `js-yaml@4.3.1` (GHSA-2883-xcg3-v3hh) and has
+  no looser range to update into. This avoids `npm audit fix --force`, which would otherwise
+  downgrade `pm2` from `7.0.4` to `5.3.1`. Remove the override once `pm2` bumps its own `js-yaml`
+  dependency past `4.3.1`.
 - **Linting scope:** `super-linter` runs with `VALIDATE_ALL_CODEBASE: false`, but still lints the
   full content of any changed file, not just changed lines.
 

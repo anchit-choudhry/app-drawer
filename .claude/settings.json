@@ -1,9 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C * diff *)",
-      "Bash(git -C * log *)",
-      "Bash(git -C * status*)",
+      "Bash(git -C packages/express-static-serve diff *)",
+      "Bash(git -C packages/express-static-serve log *)",
+      "Bash(git -C packages/express-static-serve status*)",
       "Bash(git branch -d *)",
       "Bash(git diff *)",
       "Bash(git fetch*)",
