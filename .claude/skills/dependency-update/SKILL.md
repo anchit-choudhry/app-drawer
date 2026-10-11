@@ -23,8 +23,11 @@ into a repeatable process. Covers the npm workspace as a whole - there is only o
    to the correct workspace if the package isn't at the root).
 5. **Audit**: Run `npm audit`. If vulnerabilities remain, run `npm audit fix` - never
    `npm audit fix --force`, per CLAUDE.md.
-6. **Verify**: Start the server locally (`cd packages/express-static-serve && node server.js`)
-   and confirm `GET /` returns `{ "status": "UP" }` before considering the update complete.
+6. **Verify**: Run `npm test` from the repository root and confirm it passes, then start the
+   server locally (`cd packages/express-static-serve && node server.js`) and confirm `GET /`
+   returns `{ "status": "UP" }` before considering the update complete. Without a `dist/`
+   directory the server prints a `dist/ not found` warning at startup; that is expected here and
+   is not a failure.
 
 ## Commands
 
@@ -32,5 +35,6 @@ into a repeatable process. Covers the npm workspace as a whole - there is only o
 - `npm update [packages...]`: Update selected packages.
 - `npm audit`: Check for known vulnerabilities.
 - `npm audit fix`: Fix vulnerabilities automatically (never with `--force`).
+- `npm test`: Run every workspace's tests (from the repository root).
 - `node packages/express-static-serve/server.js`: Verify the server still starts and serves
   `GET /` correctly after updates.

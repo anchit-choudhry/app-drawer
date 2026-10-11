@@ -1,18 +1,20 @@
 const express = require("express");
 const expressStaticGzip = require("express-static-gzip");
+const fs = require("fs");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DIST_DIR = path.join(__dirname, "dist");
 const SHUTDOWN_TIMEOUT_MS = 10000;
 const statusUp = {
   status: "UP",
 };
 const compressionOrder = ["zstd", "br", "gz", "deflate"];
 
-function setCustomCacheControl(res, file) {
+function setCustomCacheControl(res) {
   res.setHeader(
     "Cache-Control",
     "public, max-age=7200, must-revalidate, s-maxage=14400, proxy-revalidate"
@@ -34,7 +36,7 @@ app.get("/", (req, res) => {
 
 app.use(
   "/",
-  expressStaticGzip(path.join(__dirname, "dist"), {
+  expressStaticGzip(DIST_DIR, {
     enableBrotli: true,
     customCompressions: [
       { encodingName: "zstd", fileExtension: "zst" },
@@ -51,10 +53,16 @@ app.use((req, res) => {
   res.status(404).render("404", { url: req.originalUrl });
 });
 
-app.use((err, req, res, next) => {
+function errorHandler(err, req, res, next) {
   console.error(err);
-  res.status(err.status || 500).render("500", { error: err });
-});
+  if (res.headersSent) {
+    return next(err);
+  }
+  const hasErrorStatus = Number.isInteger(err.status) && err.status >= 400 && err.status <= 599;
+  res.status(hasErrorStatus ? err.status : 500).render("500", { error: err });
+}
+
+app.use(errorHandler);
 
 function shutdown(signal) {
   console.log(`Received ${signal}, shutting down gracefully`);
@@ -69,6 +77,9 @@ function shutdown(signal) {
 
 let server;
 if (require.main === module) {
+  if (!fs.existsSync(DIST_DIR)) {
+    console.warn(`dist/ not found at ${DIST_DIR} - every request except GET / will return 404`);
+  }
   server = app.listen(PORT, () => {
     console.log(`Server Established at PORT -> ${PORT}`);
   });
@@ -77,3 +88,5 @@ if (require.main === module) {
 }
 
 module.exports = app;
+module.exports.errorHandler = errorHandler;
+module.exports.SHUTDOWN_TIMEOUT_MS = SHUTDOWN_TIMEOUT_MS;

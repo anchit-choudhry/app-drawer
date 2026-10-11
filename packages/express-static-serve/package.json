@@ -7,7 +7,11 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
-    "test": "node --test --test-concurrency=1"
+    "test": "node --test --test-concurrency=1",
+    "test:coverage": "node --test --test-concurrency=1 --experimental-test-coverage",
+    "precompress": "node scripts/precompress.js",
+    "verify-dist": "node scripts/verify-dist.js",
+    "prepare-dist": "node scripts/prepare-dist.js"
   },
   "dependencies": {
     "ejs": "^6.0.1",
@@ -19,5 +23,8 @@
   },
   "devDependencies": {
     "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=22.15.0"
   }
 }

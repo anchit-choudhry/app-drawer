@@ -8,9 +8,9 @@
   "main": "index.js",
   "keywords": [],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start:express-static-serve": "pm2 start packages/express-static-serve/server.js --time -i 0",
-    "stop:express-static-serve": "pm2 stop packages/express-static-serve/server.js",
+    "test": "npm test --workspaces --if-present",
+    "start:express-static-serve": "pm2 start packages/express-static-serve/ecosystem.config.js",
+    "stop:express-static-serve": "pm2 stop express-static-serve",
     "logs:express-static-serve": "pm2 logs"
   },
   "workspaces": [
@@ -19,5 +19,8 @@
   "overrides": {
     "js-yaml": "4.3.2"
   },
-  "packageManager": "npm@12.0.1+sha512.2f94fd8bf600416416a934bfc59c4991e8bff7372ef7d842784e2a8b8d48c81555ee645069ddea73625fb8e92dc261feab0188fd5dab6c22fefd46316f5f9140"
+  "packageManager": "npm@12.0.1+sha512.2f94fd8bf600416416a934bfc59c4991e8bff7372ef7d842784e2a8b8d48c81555ee645069ddea73625fb8e92dc261feab0188fd5dab6c22fefd46316f5f9140",
+  "engines": {
+    "node": ">=22.15.0"
+  }
 }

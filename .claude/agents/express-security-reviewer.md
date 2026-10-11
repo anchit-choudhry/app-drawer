@@ -27,6 +27,13 @@ check the actual diff or file content against each one:
 5. **Boundary validation**: Per CLAUDE.md's "Process" guideline, flag defensive code added for
    scenarios that can't happen (e.g. re-validating input already validated by Express/Helmet), and
    flag missing validation at real system boundaries (user input, external calls).
+6. **Error handling**: `app.set("verbose errors", ...)` must stay enabled only when
+   `NODE_ENV=development` (fails closed), `views/500.ejs` may show `error.message` and
+   `error.stack` only inside that setting, and the error must still be logged server-side via
+   `console.error`. `test/error-handler.test.js` covers the handler's status and
+   `res.headersSent` behavior.
+7. **PM2 shutdown window**: `kill_timeout` in `ecosystem.config.js` must stay above
+   `SHUTDOWN_TIMEOUT_MS` in `server.js`; `test/ecosystem.test.js` enforces it.
 
 Report findings as a short list: file, line if applicable, which invariant is violated, and the
 concrete fix. If nothing is wrong, say so briefly - do not pad the review with restated context.

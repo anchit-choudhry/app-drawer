@@ -12,21 +12,37 @@ const distDir = path.join(__dirname, "..", "dist");
 const fixtureName = "hello.txt";
 const fixtureContent = "hello world";
 const fixturePath = path.join(distDir, fixtureName);
-const fixtureBrPath = path.join(distDir, `${fixtureName}.br`);
+// Pre-compressed variants keyed by the file extension express-static-gzip matches on.
+// zstd needs a recent Node (zlib.zstdCompressSync), so that variant is optional.
+const variants = {
+  br: zlib.brotliCompressSync(fixtureContent),
+  gz: zlib.gzipSync(fixtureContent),
+  zz: zlib.deflateSync(fixtureContent),
+};
+const zstdSupported = typeof zlib.zstdCompressSync === "function";
+if (zstdSupported) {
+  variants.zst = zlib.zstdCompressSync(fixtureContent);
+}
+const variantPath = (ext) => path.join(distDir, `${fixtureName}.${ext}`);
+const variantPaths = Object.keys(variants).map(variantPath);
 
 // Only remove dist/ afterward if this file is the one that created it - a
 // pre-built production dist/ (per CLAUDE.md) must never be deleted by tests.
 const distDirPreexisted = fs.existsSync(distDir);
 fs.mkdirSync(distDir, { recursive: true });
 fs.writeFileSync(fixturePath, fixtureContent);
-fs.writeFileSync(fixtureBrPath, zlib.brotliCompressSync(fixtureContent));
+for (const [ext, content] of Object.entries(variants)) {
+  fs.writeFileSync(variantPath(ext), content);
+}
 
 const app = require("../server");
 
 after(() => {
   if (distDirPreexisted) {
     fs.rmSync(fixturePath, { force: true });
-    fs.rmSync(fixtureBrPath, { force: true });
+    for (const variantPath of variantPaths) {
+      fs.rmSync(variantPath, { force: true });
+    }
   } else {
     fs.rmSync(distDir, { recursive: true, force: true });
   }
@@ -55,6 +71,48 @@ describe("static file serving", () => {
     const res = await request(app).get(`/${fixtureName}`).set("Accept-Encoding", "br");
     assert.equal(res.status, 200);
     assert.equal(res.headers["content-encoding"], "br");
+  });
+
+  test("serves the gzip variant when it is the only encoding accepted", async () => {
+    const res = await request(app).get(`/${fixtureName}`).set("Accept-Encoding", "gzip");
+    assert.equal(res.headers["content-encoding"], "gzip");
+    assert.equal(res.text, fixtureContent);
+  });
+
+  test("serves the deflate variant when it is the only encoding accepted", async () => {
+    const res = await request(app).get(`/${fixtureName}`).set("Accept-Encoding", "deflate");
+    assert.equal(res.headers["content-encoding"], "deflate");
+    assert.equal(res.text, fixtureContent);
+  });
+
+  test(
+    "serves the zstd variant when the client accepts it",
+    { skip: !zstdSupported && "zlib.zstdCompressSync is unavailable on this Node version" },
+    async () => {
+      const res = await request(app).get(`/${fixtureName}`).set("Accept-Encoding", "zstd");
+      assert.equal(res.headers["content-encoding"], "zstd");
+    }
+  );
+
+  test(
+    "prefers zstd, then brotli, then gzip, then deflate when several are accepted",
+    { skip: !zstdSupported && "zlib.zstdCompressSync is unavailable on this Node version" },
+    async () => {
+      const accept = "deflate, gzip, br, zstd";
+      const res = await request(app).get(`/${fixtureName}`).set("Accept-Encoding", accept);
+      assert.equal(res.headers["content-encoding"], "zstd");
+    }
+  );
+
+  test("falls back to the uncompressed file when no encoding is accepted", async () => {
+    const res = await request(app).get(`/${fixtureName}`).set("Accept-Encoding", "identity");
+    assert.equal(res.headers["content-encoding"], undefined);
+    assert.equal(res.text, fixtureContent);
+  });
+
+  test("varies the response on Accept-Encoding so caches keep variants apart", async () => {
+    const res = await request(app).get(`/${fixtureName}`).set("Accept-Encoding", "br");
+    assert.match(res.headers.vary, /Accept-Encoding/i);
   });
 });
 

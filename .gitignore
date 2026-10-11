@@ -147,3 +147,8 @@ vite.config.ts.timestamp-*
 *.njsproj
 *.sln
 *.sw?
+
+.remember
+
+# Scratch directories created by the express-static-serve tests (removed after each run)
+packages/express-static-serve/test/.tmp-*
