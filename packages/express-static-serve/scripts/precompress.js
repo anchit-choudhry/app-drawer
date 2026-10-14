@@ -70,18 +70,21 @@ function precompress(dir) {
   return summary;
 }
 
+function formatSummary({ compressed, skipped, bytesBefore, bytesAfter }, dir) {
+  return (
+    `Precompressed ${compressed} file(s), skipped ${skipped}: ` +
+    `${bytesBefore} -> ${bytesAfter} bytes (best variant per file) in ${dir}`
+  );
+}
+
 if (require.main === module) {
   const dir = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist"));
   try {
-    const { compressed, skipped, bytesBefore, bytesAfter } = precompress(dir);
-    console.log(
-      `Precompressed ${compressed} file(s), skipped ${skipped}: ` +
-        `${bytesBefore} -> ${bytesAfter} bytes (best variant per file) in ${dir}`
-    );
+    console.log(formatSummary(precompress(dir), dir));
   } catch (error) {
     console.error(error.message);
     process.exit(1);
   }
 }
 
-module.exports = { precompress };
+module.exports = { precompress, formatSummary };

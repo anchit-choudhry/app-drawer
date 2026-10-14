@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const zlib = require("node:zlib");
-const { precompress } = require("../scripts/precompress");
+const { precompress, formatSummary } = require("../scripts/precompress");
 const { shouldCompress } = require("../scripts/compression-policy");
 
 const decoders = {
@@ -131,6 +131,16 @@ describe("precompress", () => {
 
   test("fails clearly when the directory does not exist", () => {
     assert.throws(() => precompress(path.join(workDir, "missing")), /not a directory/i);
+  });
+});
+
+describe("formatSummary", () => {
+  test("describes the counts and byte totals for a directory", () => {
+    const summary = { compressed: 2, skipped: 1, bytesBefore: 100, bytesAfter: 10 };
+    assert.equal(
+      formatSummary(summary, "/site/dist"),
+      "Precompressed 2 file(s), skipped 1: 100 -> 10 bytes (best variant per file) in /site/dist"
+    );
   });
 });
 

@@ -1,0 +1,43 @@
+---
+# Runs the tests, the coverage gate, and the npm supply-chain checks on every push and pull
+# request to main. Installs strictly from package-lock.json and runs on both the Node version
+# floor declared in package.json (`engines`) and the version pinned in .nvmrc.
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22.15.0", "24"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      # `npm ci` fails if package.json and package-lock.json disagree. The root .npmrc keeps
+      # dependency install scripts disabled.
+      - name: Install dependencies from the lockfile
+        run: npm ci
+
+      - name: Run tests with the coverage gate
+        run: npm run test:coverage --workspace=express-static-serve
+
+      - name: Verify registry signatures and provenance
+        run: npm run audit:signatures

@@ -1,5 +1,5 @@
 const path = require("path");
-const { precompress } = require("./precompress");
+const { precompress, formatSummary } = require("./precompress");
 const { verifyDist } = require("./verify-dist");
 
 // One step for the whole post-build routine: compress, then verify what was written.
@@ -7,11 +7,7 @@ const { verifyDist } = require("./verify-dist");
 const dir = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist"));
 
 try {
-  const { compressed, skipped, bytesBefore, bytesAfter } = precompress(dir);
-  console.log(
-    `Precompressed ${compressed} file(s), skipped ${skipped}: ` +
-      `${bytesBefore} -> ${bytesAfter} bytes (best variant per file) in ${dir}`
-  );
+  console.log(formatSummary(precompress(dir), dir));
 } catch (error) {
   console.error(error.message);
   process.exit(1);

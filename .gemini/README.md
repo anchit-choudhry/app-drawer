@@ -8,9 +8,9 @@ To ensure information is maintained in one location, most Gemini-specific files 
 
 ### Mirrors and References
 
-- **Agents:** See [.gemini/agents/](agents/express-security-reviewer.md) (Mirrors [.claude/agents/](../../.claude/agents/))
-- **Skills:** See [.gemini/skills/](skills/dependency-update/SKILL.md) (Mirrors [.claude/skills/](../../.claude/skills/))
-- **Hooks:** See [.gemini/hooks/](hooks/README.md) (References [.claude/hooks/](../../.claude/hooks/))
+- **Agents:** See [.gemini/agents/](agents/express-security-reviewer.md) (Mirrors [.claude/agents/](../.claude/agents/))
+- **Skills:** See [.gemini/skills/](skills/dependency-update/SKILL.md) (Mirrors [.claude/skills/](../.claude/skills/))
+- **Hooks:** See [.gemini/hooks/](hooks/README.md) (References [.claude/hooks/](../.claude/hooks/))
 
 ## Project Guidance
 

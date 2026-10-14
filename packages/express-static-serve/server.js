@@ -4,6 +4,7 @@ const fs = require("fs");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
+const { verifyDist } = require("./scripts/verify-dist");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -75,10 +76,36 @@ function shutdown(signal) {
   }, SHUTDOWN_TIMEOUT_MS).unref();
 }
 
-let server;
-if (require.main === module) {
+// PM2 numbers cluster workers from 0 via NODE_APP_INSTANCE; reporting from one worker keeps
+// a startup problem from being logged once per CPU.
+function isFirstWorker() {
+  return !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === "0";
+}
+
+function reportDistStatus() {
   if (!fs.existsSync(DIST_DIR)) {
     console.warn(`dist/ not found at ${DIST_DIR} - every request except GET / will return 404`);
+    return;
+  }
+  if (process.env.VERIFY_DIST_ON_START === "true") {
+    // dist/ is populated outside this process, so it can change or become unreadable while
+    // it is scanned. The check is advisory and must never stop the server from starting.
+    try {
+      const { ok, problems } = verifyDist(DIST_DIR);
+      if (!ok) {
+        console.warn(`dist verification found problems in ${DIST_DIR}:`);
+        problems.forEach((problem) => console.warn(`  - ${problem}`));
+      }
+    } catch (error) {
+      console.warn(`dist verification could not run: ${error.message}`);
+    }
+  }
+}
+
+let server;
+if (require.main === module) {
+  if (isFirstWorker()) {
+    reportDistStatus();
   }
   server = app.listen(PORT, () => {
     console.log(`Server Established at PORT -> ${PORT}`);

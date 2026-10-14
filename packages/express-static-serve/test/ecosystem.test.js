@@ -1,4 +1,4 @@
-const { test } = require("node:test");
+const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const { SHUTDOWN_TIMEOUT_MS } = require("../server");
 const ecosystem = require("../ecosystem.config");
@@ -11,6 +11,22 @@ test("PM2 runs a single clustered app named express-static-serve", () => {
   assert.equal(appConfig.exec_mode, "cluster");
   // 0 means one worker per CPU, matching the documented auto-scaling behavior.
   assert.equal(appConfig.instances, 0);
+});
+
+describe("PM2 worker runtime hardening", () => {
+  const nodeArgs = appConfig.node_args ?? [];
+
+  test("removes the Object.prototype.__proto__ accessor", () => {
+    assert.ok(nodeArgs.includes("--disable-proto=delete"));
+  });
+
+  test("does not enable Node's permission model, which breaks PM2 cluster workers", () => {
+    // Verified against PM2 7.0.4 on Node 24: workers crash at startup with ERR_ACCESS_DENIED
+    // for the inspector API, and the only fix (--allow-inspector) lets a worker bypass the
+    // model's restrictions, so enabling it here would add risk without adding isolation.
+    const permissionFlags = nodeArgs.filter((arg) => /^--(permission|allow-)/.test(arg));
+    assert.deepEqual(permissionFlags, []);
+  });
 });
 
 test("PM2 waits longer than the server's forced-exit timer before it sends SIGKILL", () => {

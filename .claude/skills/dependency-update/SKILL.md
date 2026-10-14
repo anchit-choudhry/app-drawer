@@ -20,7 +20,9 @@ into a repeatable process. Covers the npm workspace as a whole - there is only o
    versions without explicit confirmation, since a major bump can break the Express 5 /
    express-static-gzip / Helmet integration.
 4. **Apply updates**: Run `npm update <package1> <package2> ...` for the selected packages (scoped
-   to the correct workspace if the package isn't at the root).
+   to the correct workspace if the package isn't at the root). The root `.npmrc` sets
+   `min-release-age=7`, so releases under 7 days old are skipped; for an urgent security fix, add
+   `--min-release-age=0` to that one command and tell the user why.
 5. **Audit**: Run `npm audit`. If vulnerabilities remain, run `npm audit fix` - never
    `npm audit fix --force`, per CLAUDE.md.
 6. **Verify**: Run `npm test` from the repository root and confirm it passes, then start the
