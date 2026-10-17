@@ -5,11 +5,8 @@
 # resolved against the real working directory of the pending command.
 set -uo pipefail
 
-COMMAND=$(python3 -c "
-import json, os
-d = json.loads(os.environ.get('CLAUDE_TOOL_INPUT', '{}'))
-print(d.get('command', ''))
-" 2>/dev/null || echo "")
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/hook-input.sh"
+COMMAND="$HOOK_COMMAND"
 
 if [[ -z "$COMMAND" ]]; then
   exit 0
@@ -27,7 +24,9 @@ command = sys.argv[1]
 repo_root = os.path.realpath(sys.argv[2])
 
 try:
-    tokens = shlex.split(command)
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    tokens = list(lexer)
 except ValueError:
     print('OK')
     sys.exit(0)
@@ -40,6 +39,8 @@ if not rm_indices:
 offenders = []
 for idx in rm_indices:
     for tok in tokens[idx + 1:]:
+        if set(tok) <= set('();<>|&'):
+            break
         if tok.startswith('-'):
             continue
         expanded = os.path.expandvars(os.path.expanduser(tok))
@@ -58,9 +59,9 @@ if [[ "$RESULT" == "OK" ]]; then
   exit 0
 fi
 
-echo "BLOCKED: rm target resolves outside the project directory ($REPO_ROOT)."
+echo "BLOCKED: rm target resolves outside the project directory ($REPO_ROOT)." >&2
 while IFS=$'\t' read -r tok target; do
-  echo "  '$tok' -> $target"
+  echo "  '$tok' -> $target" >&2
 done <<<"$RESULT"
-echo "Offending command: $COMMAND"
+echo "Offending command: $COMMAND" >&2
 exit 2

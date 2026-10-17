@@ -5,20 +5,25 @@
       "Bash(git -C packages/express-static-serve log *)",
       "Bash(git -C packages/express-static-serve status*)",
       "Bash(git branch -d *)",
+      "Bash(git check-ignore *)",
       "Bash(git diff *)",
       "Bash(git fetch*)",
       "Bash(git log *)",
       "Bash(git show *)",
       "Bash(git status*)",
-      "Bash(npm audit*)",
+      "Bash(npm audit)",
+      "Bash(npm audit --*)",
+      "Bash(npm ci --dry-run*)",
+      "Bash(npm fund*)",
       "Bash(npm ls*)",
       "Bash(npm outdated*)",
-      "Bash(npm run lint*)",
       "Bash(npm run start:express-static-serve*)",
       "Bash(npm run stop:express-static-serve*)",
       "Bash(npm run logs:express-static-serve*)",
       "Bash(npm test*)",
-      "Bash(npm run test:coverage*)"
+      "Bash(npm run test:coverage*)",
+      "Bash(npm run --silent audit:signatures)",
+      "Bash(npm view *)"
     ],
     "deny": [
       "Bash(npm install --global *)",
@@ -26,7 +31,8 @@
       "Bash(npm add -g *)",
       "Bash(sudo rm *)",
       "Bash(rm -rf /*)",
-      "Bash(rm -rf ~*)"
+      "Bash(rm -rf ~*)",
+      "Bash(npm audit fix*--force*)"
     ]
   },
   "hooks": {
@@ -37,6 +43,10 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-env-edit.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-hook-edit.sh\""
           },
           {
             "type": "command",
@@ -54,6 +64,10 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-rm-outside-repo.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-git-commit.sh\""
           }
         ]
       }

@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Run DevSkim scanner
         uses: microsoft/DevSkim-Action@734c6ed89671b1c7a5211ed334c79db261e3f221 # v1

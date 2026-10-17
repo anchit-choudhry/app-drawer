@@ -21,21 +21,17 @@ Steps to reproduce the behavior:
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+**Request and response**
+The request path and, if relevant, the response headers (for example `curl -i` output) or the
+relevant server log lines. Do not include secrets.
 
-**Desktop (please complete the following information):**
+**Environment (please complete the following information):**
 
-- OS: [e.g. iOS]
-- Browser [e.g. chrome, safari]
-- Version [e.g. 22]
-
-**Smartphone (please complete the following information):**
-
-- Device: [e.g. iPhone6]
-- OS: [e.g. iOS8.1]
-- Browser [e.g. stock browser, safari]
-- Version [e.g. 22]
+- Node.js version: [output of `node -v`]
+- OS: [e.g. Ubuntu 24.04, macOS 15]
+- How the server runs: [`node server.js` or PM2 cluster mode]
+- Reverse proxy or CDN in front: [e.g. nginx, Cloudflare, none]
+- `dist/` populated with precompressed variants: [yes / no]
 
 **Additional context**
 Add any other context about the problem here.

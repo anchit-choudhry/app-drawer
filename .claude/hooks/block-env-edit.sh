@@ -3,17 +3,14 @@
 # .env.example is intentionally allowed.
 set -euo pipefail
 
-FILE_PATH=$(python3 -c "
-import json, os, sys
-d = json.loads(os.environ.get('CLAUDE_TOOL_INPUT', '{}'))
-print(d.get('file_path', ''))
-" 2>/dev/null || echo "")
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/hook-input.sh"
+FILE_PATH="$HOOK_FILE_PATH"
 
 BASENAME=$(basename -- "$FILE_PATH")
 
 if [[ "$BASENAME" == .env* && "$BASENAME" != ".env.example" ]]; then
-  echo "BLOCKED: '$FILE_PATH' is gitignored and contains real secrets."
-  echo "Edit .env.example instead, then copy to .env manually."
+  echo "BLOCKED: '$FILE_PATH' is gitignored and contains real secrets." >&2
+  echo "Edit .env.example instead, then copy to .env manually." >&2
   exit 2
 fi
 

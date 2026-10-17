@@ -1,0 +1,3 @@
+# Prettier reflows hand-wrapped prose and splits inline code spans across lines. markdownlint and
+# EditorConfig already cover Markdown structure and line length, so Markdown is left alone.
+*.md

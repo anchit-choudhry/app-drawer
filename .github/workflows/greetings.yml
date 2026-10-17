@@ -16,5 +16,9 @@ jobs:
       - uses: actions/first-interaction@3c71ce730280171fd1cfb57c00c774f8998586f7 # v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: "Message that will be displayed on users' first issue"
-          pr-message: "Message that will be displayed on users' first pull request"
+          issue-message: >-
+            Thanks for opening your first issue. Please include your Node.js version, the steps
+            to reproduce, and any relevant server logs. Never paste secrets.
+          pr-message: >-
+            Thanks for your first pull request. Please confirm that `npm test` passes and
+            describe what the change does and why.

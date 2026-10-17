@@ -4,7 +4,7 @@
 #
 # You can adjust the behavior by modifying this file.
 # For more information, see:
-# https://github.com/github/super-linter
+# https://github.com/super-linter/super-linter
 name: Lint Code Base
 
 on:
@@ -28,10 +28,19 @@ jobs:
         with:
           # Full git history is needed to get a proper list of changed files within `super-linter`
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Lint Code Base
-        uses: github/super-linter@985ef206aaca4d560cb9ee2af2b42ba44adc1d55 # v4
+        # The slim image covers the languages in this repo (JavaScript, JSON, YAML, Markdown,
+        # shell, EJS/HTML) without the multi-gigabyte full image.
+        uses: super-linter/super-linter/slim@2da136927bd4a73596db63044b504547c62cb854 # v9.0.0
         env:
           VALIDATE_ALL_CODEBASE: false
           DEFAULT_BRANCH: "main"
+          # Biome overlaps Prettier (formatting) and ESLint (linting), and its default formatter
+          # wants tabs where this repo uses two spaces. super-linter itself warns about the
+          # conflict, so keep Prettier and ESLint and switch Biome off. Every other linter stays
+          # on; tune them through the config files in .github/linters/.
+          VALIDATE_BIOME_FORMAT: false
+          VALIDATE_BIOME_LINT: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

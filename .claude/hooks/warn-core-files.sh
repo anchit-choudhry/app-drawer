@@ -5,11 +5,8 @@
 # Does NOT block (exit 0) - informational only.
 set -uo pipefail
 
-FILE_PATH=$(python3 -c "
-import json, os
-d = json.loads(os.environ.get('CLAUDE_TOOL_INPUT', '{}'))
-print(d.get('file_path', ''))
-" 2>/dev/null || echo "")
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/hook-input.sh"
+FILE_PATH="$HOOK_FILE_PATH"
 
 if [[ -z "$FILE_PATH" ]]; then
   exit 0
@@ -17,16 +14,30 @@ fi
 
 BASENAME=$(basename -- "$FILE_PATH")
 
+# Claude never sees stdout or stderr from a PreToolUse hook that exits 0. Returning the
+# reminder as additionalContext puts it in front of Claude without changing the permission
+# decision.
+emit_notice() {
+  python3 -c '
+import json, sys
+text = "\n".join(sys.argv[1:])
+output = {"hookEventName": "PreToolUse", "additionalContext": text}
+print(json.dumps({"hookSpecificOutput": output}))
+' "$@"
+}
+
 if [[ "$BASENAME" == "server.js" ]] && [[ "$FILE_PATH" == *"express-static-serve"* ]]; then
-  echo "NOTICE: 'server.js' has a documented middleware-order invariant."
-  echo "  - Required order: Helmet -> Morgan -> routes -> static files (see CLAUDE.md)."
-  echo "  - Do not bypass security headers or introduce undocumented config changes."
-  echo "  After editing, run: npm test (and start the server to confirm GET / returns UP)."
+  emit_notice \
+    "NOTICE: 'server.js' has a documented middleware-order invariant." \
+    "  - Required order: Helmet -> Morgan -> routes -> static files (see CLAUDE.md)." \
+    "  - Do not bypass security headers or introduce undocumented config changes." \
+    "  After editing, run: npm test (and start the server to confirm GET / returns UP)."
 elif [[ "$BASENAME" == "ecosystem.config.js" ]] &&
   [[ "$FILE_PATH" == *"express-static-serve"* ]]; then
-  echo "NOTICE: 'ecosystem.config.js' kill_timeout must exceed SHUTDOWN_TIMEOUT_MS in server.js."
-  echo "  - Otherwise PM2 SIGKILLs workers that are still draining in-flight requests."
-  echo "  After editing, run: npm test (test/ecosystem.test.js enforces this)."
+  emit_notice \
+    "NOTICE: 'ecosystem.config.js' kill_timeout must exceed SHUTDOWN_TIMEOUT_MS in server.js." \
+    "  - Otherwise PM2 SIGKILLs workers that are still draining in-flight requests." \
+    "  After editing, run: npm test (test/ecosystem.test.js enforces this)."
 fi
 
 exit 0

@@ -10,7 +10,13 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    # Matches `min-release-age=7` in .npmrc: do not propose a version until it is a week old.
+    # Security updates ignore the cooldown.
+    cooldown:
+      default-days: 7
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7

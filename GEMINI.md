@@ -174,11 +174,14 @@ The root `npm test` runs every workspace's tests (`npm test --workspaces --if-pr
   `npm run audit:signatures` verifies registry signatures and provenance attestations.
   `test/supply-chain.test.js` enforces both settings, plus that the lockfile only resolves from
   `https://registry.npmjs.org/` with integrity hashes and no git, file, or URL dependency specs.
-- **CI/CD:** Automated security scans (CodeQL, DevSkim, njsscan, OSSAR, OSV Scanner, Defender for
-  DevOps) run on push to `main`, on pull requests targeting `main`, and on a weekly schedule.
-  Dependency Review runs on pull requests targeting `main` only.
+- **CI/CD:** Automated security scans (CodeQL, DevSkim, njsscan, OSV Scanner) run on push to
+  `main`, on pull requests targeting `main`, and on a weekly schedule. Dependency Review runs on
+  pull requests targeting `main` only. OSSAR and Defender for DevOps were removed: they ran on
+  Windows runners and overlapped with the scanners above.
 - **Dependabot:** `.github/dependabot.yml` opens npm and github-actions update PRs on a weekly
-  schedule.
+  schedule, waiting 7 days (`cooldown`) before proposing a new version.
+- **Workflow safety:** every `actions/checkout` sets `persist-credentials: false`, and no `run:`
+  script may contain a `${{ }}` expression (pass it through `env:` instead); see CLAUDE.md.
 - **Lockfile integrity:** If `package-lock.json` is missing `resolved`/`integrity` fields, `npm
   install` alone won't fix it while `node_modules` still exists - remove both first.
 - **Transitive vulnerability overrides:** The root `package.json` pins `js-yaml` to `4.3.2` via
@@ -198,7 +201,9 @@ The root `npm test` runs every workspace's tests (`npm test --workspaces --if-pr
   `test:coverage`, and `audit:signatures` on Node 22.15.0 and 24. `test/supply-chain.test.js`
   enforces the pinning, the permissions, Dependabot's `github-actions` entry, and `ci.yml`.
 - **Linting scope:** `super-linter` runs with `VALIDATE_ALL_CODEBASE: false`, but still lints the
-  full content of any changed file, not just changed lines.
+  full content of any changed file, not just changed lines. Its per-linter config lives in
+  `.github/linters/` under fixed file names (notably `.markdown-lint.yml`); see CLAUDE.md,
+  "Linter config" and "Run super-linter locally".
 
 ## Gemini CLI Tooling Notes
 

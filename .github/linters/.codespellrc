@@ -1,0 +1,5 @@
+[codespell]
+check-hidden =
+skip = package-lock.json,*/package-lock.json,*/go.mod,*/go.sum,*.log,.git
+# "ois" is a Java variable name (ObjectInputStream) in the OWASP skill examples.
+ignore-words-list = ois

@@ -4,11 +4,9 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-# A sample workflow which sets up periodic OSV-Scanner scanning for vulnerabilities,
-# in addition to a PR check which fails if new vulnerabilities are introduced.
-#
-# For more examples and options, including how to ignore specific vulnerabilities,
-# see https://google.github.io/osv-scanner/github-action/
+# Periodic OSV-Scanner scan for vulnerabilities, plus a pull request check that fails if new
+# vulnerabilities are introduced. Options, including how to ignore a specific vulnerability:
+# https://google.github.io/osv-scanner/github-action/
 
 name: OSV-Scanner
 
@@ -23,20 +21,16 @@ on:
     branches: ["main"]
 
 permissions:
-  # Read commit contents
+  # Read commit contents. The wider grants (security-events: write to upload SARIF, and
+  # actions: read, see https://github.com/github/codeql-action/issues/2117) are declared on
+  # each job below, per the repo's workflow permissions policy.
   contents: read
-  # Require writing security events to upload SARIF file to security tab
-  security-events: write
-  # Required to upload SARIF file to CodeQL.
-  # See: https://github.com/github/codeql-action/issues/2117
-  actions: read
 
 jobs:
   scan-scheduled:
     if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@90b209d0ea55cea1da9fc0c4e65782cc6acb6e2e" # v2.2.2
     with:
-      # Example of specifying custom arguments
       scan-args: |-
         -r
         --include-git-root
@@ -55,7 +49,6 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@90b209d0ea55cea1da9fc0c4e65782cc6acb6e2e" # v2.2.2
     with:
-      # Example of specifying custom arguments
       scan-args: |-
         -r
         --include-git-root

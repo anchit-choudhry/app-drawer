@@ -74,6 +74,36 @@ describe("lockfile supply chain", () => {
   });
 });
 
+// Returns the 1-based line numbers of every `${{ }}` expression inside a workflow `run:` script,
+// whether the script is inline or a multi-line block. Event fields and step outputs can carry
+// attacker-controlled text (an issue body, or a model's reply to it), so they must reach the
+// shell through `env:` instead.
+function findRunScriptExpressions(workflowText) {
+  const lines = workflowText.split("\n");
+  const found = [];
+  lines.forEach((line, index) => {
+    const keyAt = line.search(/\brun:/);
+    if (keyAt === -1 || !/^\s*(-\s+)?run:/.test(line)) {
+      return;
+    }
+    const inline = line.slice(keyAt + "run:".length);
+    if (inline.includes("${{")) {
+      found.push(index + 1);
+    }
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const body = lines[next];
+      const indent = body.length - body.trimStart().length;
+      if (body.trim() !== "" && indent <= keyAt) {
+        break;
+      }
+      if (body.includes("${{") && !body.trimStart().startsWith("#")) {
+        found.push(next + 1);
+      }
+    }
+  });
+  return found;
+}
+
 describe("GitHub workflows", () => {
   const workflowDir = path.join(repoRoot, ".github", "workflows");
   const workflows = fs
@@ -97,6 +127,39 @@ describe("GitHub workflows", () => {
         .map((ref) => `${file}: ${ref}`)
     );
     assert.deepEqual(unpinned, []);
+  });
+
+  test("every checkout step leaves the token out of .git/config", () => {
+    const offenders = workflows
+      .filter(({ text }) => {
+        const checkouts = text.match(/uses:\s*actions\/checkout@/g) ?? [];
+        const hardened = text.match(/persist-credentials:\s*false/g) ?? [];
+        return checkouts.length !== hardened.length;
+      })
+      .map(({ file }) => file);
+    assert.deepEqual(offenders, []);
+  });
+
+  test("no run script expands a workflow expression, which would allow script injection", () => {
+    const offenders = workflows.flatMap(({ file, text }) =>
+      findRunScriptExpressions(text).map((line) => `${file}:${line}`)
+    );
+    assert.deepEqual(offenders, []);
+  });
+
+  test("the run script injection check flags an expression inside a script", () => {
+    const vulnerable = [
+      "steps:",
+      "  - name: Comment",
+      "    run: |",
+      "      gh issue comment 1 --body '${{ steps.inference.outputs.response }}'",
+      "    env:",
+      "      RESPONSE: ${{ steps.inference.outputs.response }}",
+    ].join("\n");
+    assert.deepEqual(findRunScriptExpressions(vulnerable), [4]);
+    assert.deepEqual(findRunScriptExpressions('    run: echo "${{ github.sha }}"'), [1]);
+    const safe = '    run: gh issue comment 1 --body "$RESPONSE"';
+    assert.deepEqual(findRunScriptExpressions(safe), []);
   });
 
   test("Dependabot keeps both npm packages and GitHub Actions up to date", () => {

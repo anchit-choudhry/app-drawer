@@ -9,6 +9,14 @@ App Drawer is a monorepo for Node-based applications. It currently contains a si
 `express-static-serve`, which is an Express.js server that serves static assets with intelligent
 compression negotiation and security headers.
 
+## Layout
+
+- `packages/express-static-serve/`: the only package. `server.js` (app and startup),
+  `ecosystem.config.js` (PM2), `scripts/` (dist tooling), `views/` (404/500), `test/`.
+- `.claude/`: hooks, skills, agents, rules. `.gemini/` and `GEMINI.md` mirror this file for
+  Gemini CLI; keep them in sync when invariants change.
+- `.github/`: workflows, Dependabot, labeler, issue templates, `SECURITY.md`.
+
 ## Architecture
 
 ### express-static-serve
@@ -59,6 +67,13 @@ or pass a directory), run via `npm run <script> --workspace=express-static-serve
 
 All three need Node 22.15+ (`zlib.zstdCompressSync`).
 
+Run and test:
+
+- `node packages/express-static-serve/server.js` starts one process on `PORT` (default 3000).
+  `PORT`, `NODE_ENV`, and `VERIFY_DIST_ON_START` are tabled in the README.
+- `npm run logs:express-static-serve` shows the PM2 logs.
+- One test file: `node --test packages/express-static-serve/test/server.test.js`.
+
 Other non-default project configuration:
 
 - Both `package.json` files declare `engines.node` as `>=22.15.0`; `.nvmrc` pins Node 24.
@@ -103,10 +118,37 @@ The `express-static-serve` tests create and remove their own `dist/` fixtures, s
   trailing comment (Dependabot updates both), and every workflow declares top-level `permissions:
   contents: read`, with wider grants only at job level. The long pinned lines exceed 100
   characters, which the YAML linter only warns about. `.github/workflows/ci.yml` runs `npm ci`,
-  `test:coverage`, and `audit:signatures` on Node 22.15.0 and 24. `test/supply-chain.test.js`
-  enforces the pinning, the permissions, Dependabot's `github-actions` entry, and `ci.yml`.
-- **Linting scope:** `super-linter` runs with `VALIDATE_ALL_CODEBASE: false`, but still lints the
-  full content of any changed file, not just changed lines.
+  `test:coverage`, and `audit:signatures` on Node 22.15.0 and 24. Every `actions/checkout` sets
+  `persist-credentials: false`, and no `run:` script may contain a `${{ }}` expression: event
+  fields and step outputs (an issue body, a model's reply) can be attacker-controlled, so pass
+  them through `env:` and quote the variable. Dependabot waits 7 days (`cooldown`) before
+  proposing a version, matching `min-release-age`. `test/supply-chain.test.js` enforces the
+  pinning, the permissions, both checkout and `run:` rules, Dependabot's `github-actions` entry,
+  and `ci.yml`.
+- **Linting scope:** `super-linter` (the `super-linter/super-linter/slim` action, pinned to a
+  SHA like every other action) runs with `VALIDATE_ALL_CODEBASE: false`, but still lints the full
+  content of any changed file, not just changed lines.
+- **Linter config:** each linter reads a fixed file name from `.github/linters/`:
+  `.markdown-lint.yml` (not `.markdownlint.yml`, which super-linter silently ignores),
+  `.editorconfig-checker.json`, `.jscpd.json`, `.textlintrc`, `.codespellrc`, `.yaml-lint.yml`,
+  and `zizmor.yaml`. Prettier reads the root `.prettierrc.json` and `.prettierignore` (Markdown is
+  ignored there). Biome is switched off in the workflow because it conflicts with Prettier and
+  ESLint; setting `VALIDATE_<LINTER>: false` only disables that one. `.trivyignore` holds the
+  expiring `braces` exception (no fixed release exists); remove it once one is published.
+- **Run super-linter locally:** it needs Docker, an `amd64` image, and a clean tree because it
+  reads tracked files only, so stage new files first (`git add -N`) or add
+  `-e USE_FIND_ALGORITHM=true`, which cannot be combined with `DEFAULT_BRANCH`:
+
+  ```bash
+  docker run --rm --platform linux/amd64 -e RUN_LOCAL=true -e VALIDATE_ALL_CODEBASE=true \
+    -e IGNORE_GITIGNORED_FILES=true -e VALIDATE_BIOME_FORMAT=false -e VALIDATE_BIOME_LINT=false \
+    -v "$PWD":/tmp/lint ghcr.io/super-linter/super-linter:slim-v9.0.0
+  ```
+
+  Trivy unpacks a vulnerability database of about 1 GB inside the container. If Docker's disk is
+  nearly full it fails with `no space left on device` and no findings; mount a host directory at
+  `/github/home/.cache/trivy` (`-v "$PWD/.tmp-trivy-cache":/github/home/.cache/trivy`) and delete
+  it afterwards.
 
 ## Coding and Commit Style Guidelines
 
@@ -115,7 +157,8 @@ When working within this repository, adhere to the following style and commit ru
 - **Code Style**
   - **Max Line Length:** 100 characters.
   - **Module System:** CommonJS (`require`/`module.exports`).
-  - **Typography:** **NEVER** use en dashes (–) or em dashes (—). Use only standard hyphens (-).
+  - **Typography:** **NEVER** use en dashes (–) or em dashes (—) in code, documentation, or
+    commit messages. Use only standard hyphens (-).
 - **Commit Safety:** Do not create commits automatically; only commit when explicitly instructed.
   Never suggest `git commit`.
 - **Problem Resolution:** If unsure or if there is more than one way a task can be done, conduct
@@ -123,17 +166,14 @@ When working within this repository, adhere to the following style and commit ru
 - **Commit Messages:** Use past participles in commit messages (e.g., "Added", "Fixed", "Updated").
   For code refactoring, simplification, and formatting, a one-line commit message of "Refactored and
   Formatted code" is acceptable.
-- **Documentation and Commit Messages:** Never use en dashes (–) or em dashes (—) in documentation
-  or commit messages.
 
 ## AI/Agent Guidelines
 
 When generating or reviewing code for this project, LLMs and Agents must adhere to the following
 invariants:
 
-* **Middleware Order:** Always maintain the prescribed middleware order: Helmet $\rightarrow$
-  Morgan $\rightarrow$ routes $\rightarrow$ static files $\rightarrow$ 404 handler $\rightarrow$
-  error handler.
+* **Middleware Order:** Always maintain the prescribed middleware order: Helmet -> Morgan ->
+  routes -> static files -> 404 handler -> error handler.
 * **Configuration:** Never introduce undocumented configuration changes or bypass security checks.
 * **Process:** Trust the framework's guarantees, only validating at system boundaries (user input,
   external APIs).
@@ -144,5 +184,24 @@ invariants:
 
 - Hook commands in `.claude/settings.json` can use `$CLAUDE_PROJECT_DIR` to reference the repository
   root - no need for a `git rev-parse --show-toplevel` wrapper.
-- `GET /` is the health check route and does not go through `setCustomCacheControl`. Verify
-  Cache-Control/compression headers by requesting an actual file under `dist/`, not `/`.
+- Verify Cache-Control/compression headers by requesting a real file under `dist/`; `GET /`
+  bypasses `setCustomCacheControl`.
+- **Hook input:** hooks read the PreToolUse JSON from stdin through `.claude/lib/hook-input.sh`
+  (`HOOK_COMMAND`, `HOOK_FILE_PATH`). Never read `CLAUDE_TOOL_INPUT`: Claude Code does not set it,
+  so a hook that does is a silent no-op. Block messages go to stderr with exit 2. Test a hook by
+  piping JSON into it. Hooks match against the whole command text, so a command that merely
+  mentions a blocked pattern (for example in an `echo`) is blocked too. Claude never sees stdout
+  or stderr from a PreToolUse hook that exits 0, so a reminder (`warn-core-files.sh`) is printed
+  as JSON with `hookSpecificOutput.additionalContext` instead.
+- **Protected files:** `block-hook-edit.sh` blocks Edit/Write on `.claude/settings.json`,
+  `.gemini/settings.json`, and `hooks/*.sh`. Describe the exact change and the user applies it;
+  `.claude/lib/` is deliberately outside that glob. `block-git-commit.sh` likewise blocks
+  `git commit` from the session, which enforces Commit Safety above. For pending changes to those
+  files, `node .claude/lib/apply-hardening.js` (add `--dry-run` to preview) applies them
+  idempotently and verifies the result; extend its steps instead of hand-editing the hooks.
+- **Personal sound hook:** `.claude/hooks/notification-alert.sh` plays a macOS sound on
+  notifications. It is git-ignored and registered in the git-ignored `.claude/settings.local.json`,
+  not in the shared `settings.json`; the same script step creates that registration.
+- **Skills, agents, rules:** skills `dependency-update`, `owasp-security-audit`, and
+  `web-security-audit`; agent `express-security-reviewer` (run it after editing `server.js`);
+  `.claude/rules/markdown.md` is the Markdown style rule, adapted to the markdownlint config.

@@ -5,9 +5,7 @@
 [![CodeQL][cql-b]][cql-l]
 [![DevSkim][dvs-b]][dvs-l]
 [![Lint Code Base][lnt-b]][lnt-l]
-[![Microsoft Defender For Devops](https://github.com/anchit-choudhry/app-drawer/actions/workflows/defender-for-devops.yml/badge.svg)](https://github.com/anchit-choudhry/app-drawer/actions/workflows/defender-for-devops.yml)
 [![njsscan][njs-b]][njs-l]
-[![OSSAR][oss-b]][oss-l]
 [![OSV Scanner][osv-b]][osv-l]
 
 Powered by
@@ -84,8 +82,6 @@ To deliver a new build:
 [lnt-l]: https://github.com/anchit-choudhry/app-drawer/actions/workflows/super-linter.yml
 [njs-b]: https://github.com/anchit-choudhry/app-drawer/actions/workflows/njsscan.yml/badge.svg
 [njs-l]: https://github.com/anchit-choudhry/app-drawer/actions/workflows/njsscan.yml
-[oss-b]: https://github.com/anchit-choudhry/app-drawer/actions/workflows/ossar.yml/badge.svg
-[oss-l]: https://github.com/anchit-choudhry/app-drawer/actions/workflows/ossar.yml
 [osv-b]: https://github.com/anchit-choudhry/app-drawer/actions/workflows/osv-scanner.yml/badge.svg
 [osv-l]: https://github.com/anchit-choudhry/app-drawer/actions/workflows/osv-scanner.yml
 [exp-b]: https://img.shields.io/badge/Express.js-%23404d59.svg?logo=express&logoColor=%2361DAFB
