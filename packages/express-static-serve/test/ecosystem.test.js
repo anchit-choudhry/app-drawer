@@ -1,9 +1,48 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
+const path = require("node:path");
+// A TRUST_PROXY exported in the developer's shell must not change what these tests load.
+delete process.env.TRUST_PROXY;
 const { SHUTDOWN_TIMEOUT_MS } = require("../server");
 const ecosystem = require("../ecosystem.config");
 
 const [appConfig] = ecosystem.apps;
+const packageDir = path.join(__dirname, "..");
+
+// Loads ecosystem.config.js in a fresh process, as `pm2 start` does, with a chosen TRUST_PROXY.
+function loadEcosystem(trustProxy) {
+  const env = { ...process.env };
+  delete env.TRUST_PROXY;
+  if (trustProxy !== undefined) {
+    env.TRUST_PROXY = trustProxy;
+  }
+  const script = 'process.stdout.write(require("./ecosystem.config").apps[0].env.TRUST_PROXY)';
+  return spawnSync(process.execPath, ["-e", script], { cwd: packageDir, env, encoding: "utf8" });
+}
+
+describe("PM2 worker environment", () => {
+  test("starts workers in production mode", () => {
+    assert.equal(appConfig.env.NODE_ENV, "production");
+  });
+
+  test("forwards TRUST_PROXY as 0 when it is unset", () => {
+    const result = loadEcosystem(undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, "0");
+  });
+
+  test("forwards a valid TRUST_PROXY unchanged", () => {
+    assert.equal(loadEcosystem("2").stdout, "2");
+  });
+
+  test("refuses to load with a bad TRUST_PROXY, so pm2 stops before any worker starts", () => {
+    const result = loadEcosystem("true");
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /TRUST_PROXY/);
+    assert.match(result.stderr, /"true"/);
+  });
+});
 
 test("PM2 runs a single clustered app named express-static-serve", () => {
   assert.equal(ecosystem.apps.length, 1);

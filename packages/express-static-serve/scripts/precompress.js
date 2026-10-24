@@ -1,7 +1,7 @@
 const fs = require("fs");
-const path = require("path");
 const zlib = require("zlib");
 const { shouldCompress, LEVELS } = require("./compression-policy");
+const { listFiles, resolveDistDir } = require("./dist-common");
 
 // Keyed by the file extension express-static-gzip matches on (see server.js).
 const encoders = {
@@ -22,15 +22,8 @@ function isVariant(file) {
   return variantExtensions.some((extension) => file.endsWith(`.${extension}`));
 }
 
-// Symlinks are skipped so a link inside dist/ can never pull in a file from outside it.
 function listSourceFiles(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const entryPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return listSourceFiles(entryPath);
-    }
-    return entry.isFile() && !isVariant(entryPath) ? [entryPath] : [];
-  });
+  return listFiles(dir).filter((file) => !isVariant(file));
 }
 
 function precompress(dir) {
@@ -78,7 +71,7 @@ function formatSummary({ compressed, skipped, bytesBefore, bytesAfter }, dir) {
 }
 
 if (require.main === module) {
-  const dir = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist"));
+  const dir = resolveDistDir(process.argv[2]);
   try {
     console.log(formatSummary(precompress(dir), dir));
   } catch (error) {

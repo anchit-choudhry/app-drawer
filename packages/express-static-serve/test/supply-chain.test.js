@@ -74,6 +74,44 @@ describe("lockfile supply chain", () => {
   });
 });
 
+describe("package metadata", () => {
+  const root = readJson("package.json");
+  const workspace = readJson("packages", "express-static-serve", "package.json");
+  const lock = readJson("package-lock.json");
+  const repositoryPath = "github.com/anchit-choudhry/app-drawer";
+
+  test("both manifests use the license of the LICENSE file and the same author", () => {
+    for (const manifest of [root, workspace]) {
+      assert.equal(manifest.license, "Apache-2.0");
+      assert.equal(manifest.author, "anchit-choudhry");
+    }
+  });
+
+  test("both manifests describe themselves and point at the repository", () => {
+    for (const manifest of [root, workspace]) {
+      assert.ok(manifest.description.length > 0);
+      assert.ok(manifest.repository.url.includes(repositoryPath));
+      assert.ok(manifest.bugs.url.includes(repositoryPath));
+      assert.ok(manifest.homepage.includes(repositoryPath));
+    }
+    assert.equal(workspace.repository.directory, "packages/express-static-serve");
+  });
+
+  test("the workspace package cannot be published by accident", () => {
+    assert.equal(workspace.private, true);
+  });
+
+  test("the root manifest has no main entry or empty keywords", () => {
+    assert.equal(root.main, undefined);
+    assert.equal(root.keywords, undefined);
+  });
+
+  test("the lockfile records the same license for the root and the workspace", () => {
+    assert.equal(lock.packages[""].license, "Apache-2.0");
+    assert.equal(lock.packages["packages/express-static-serve"].license, "Apache-2.0");
+  });
+});
+
 // Returns the 1-based line numbers of every `${{ }}` expression inside a workflow `run:` script,
 // whether the script is inline or a multi-line block. Event fields and step outputs can carry
 // attacker-controlled text (an issue body, or a model's reply to it), so they must reach the
@@ -174,5 +212,14 @@ describe("GitHub workflows", () => {
     assert.match(ci.text, /npm ci/);
     assert.match(ci.text, /test:coverage/);
     assert.match(ci.text, /audit:signatures/);
+  });
+
+  test("CI cancels superseded pull request runs but never a run on main", () => {
+    const ci = workflows.find(({ file }) => file === "ci.yml");
+    assert.match(ci.text, /^concurrency:/m);
+    // A run id in the group keeps every run on main in its own group, so none is replaced.
+    assert.match(ci.text, /group:.*github\.run_id/);
+    assert.match(ci.text, /cancel-in-progress:.*github\.event_name == 'pull_request'/);
+    assert.doesNotMatch(ci.text, /cancel-in-progress:\s*true\b/);
   });
 });

@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
 const { verifyDist } = require("./scripts/verify-dist");
+const { parseTrustProxy } = require("./trust-proxy");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,7 +23,8 @@ function setCustomCacheControl(res) {
   );
 }
 
-app.set("trust proxy", 1);
+// Parsed at module load so every worker stops on a bad value before it can listen.
+app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 app.set("verbose errors", process.env.NODE_ENV === "development");
@@ -32,6 +34,8 @@ app.use(morgan("combined"));
 
 app.get("/", (req, res) => {
   res.header("Content-Type", "application/json");
+  // The health check is outside setCustomCacheControl, so say explicitly that it is not cached.
+  res.header("Cache-Control", "no-store");
   res.send(statusUp);
 });
 

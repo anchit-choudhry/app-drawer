@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
+const { listFiles, resolveDistDir, reportVerification } = require("./dist-common");
 
 // Keyed by the file extension express-static-gzip matches on (see server.js).
 const decoders = {
@@ -10,16 +11,6 @@ const decoders = {
   zst: zlib.zstdDecompressSync,
 };
 const REQUIRED_FILES = ["index.html"];
-
-function listFiles(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const entryPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return listFiles(entryPath);
-    }
-    return entry.isFile() ? [entryPath] : [];
-  });
-}
 
 // Checks that dist/ is something the server can safely serve. The server itself starts and
 // reports UP with an empty or stale dist/, so this is the only place a bad build is caught.
@@ -65,15 +56,8 @@ function verifyDist(dir) {
 }
 
 if (require.main === module) {
-  const dir = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist"));
-  const { ok, problems } = verifyDist(dir);
-  if (ok) {
-    console.log(`dist OK: ${dir}`);
-  } else {
-    console.error(`dist verification failed for ${dir}:`);
-    for (const problem of problems) {
-      console.error(`  - ${problem}`);
-    }
+  const dir = resolveDistDir(process.argv[2]);
+  if (!reportVerification(dir, verifyDist(dir))) {
     process.exit(1);
   }
 }

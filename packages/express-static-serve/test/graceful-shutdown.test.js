@@ -4,6 +4,9 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
+// A TRUST_PROXY exported in the developer's shell must not change what this test starts.
+delete process.env.TRUST_PROXY;
+
 const distDir = path.join(__dirname, "..", "dist");
 const serverPath = path.join(__dirname, "..", "server.js");
 

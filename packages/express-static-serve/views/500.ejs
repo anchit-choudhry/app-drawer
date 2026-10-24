@@ -2,7 +2,5 @@
 <% if (settings['verbose errors']) { %>
   <h2>Error: <%= error.message %></h2>
   <pre><%= error.stack %></pre>
-<% } else { %>
-  <p>An error occurred!</p>
 <% } %>
 <%- include('footer') -%>

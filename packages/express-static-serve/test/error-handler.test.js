@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const express = require("express");
 const request = require("supertest");
+// A TRUST_PROXY exported in the developer's shell must not change what these tests load.
+delete process.env.TRUST_PROXY;
 const { errorHandler } = require("../server");
 
 // Mounts the real error handler behind a route that fails however the test asks,

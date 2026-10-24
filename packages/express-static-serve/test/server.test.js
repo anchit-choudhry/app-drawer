@@ -6,6 +6,10 @@ const zlib = require("node:zlib");
 const ejs = require("ejs");
 const request = require("supertest");
 
+// A TRUST_PROXY exported in the developer's shell must not change what this file loads. It has
+// to go before the fixtures below: a bad value makes the require throw and would strand them.
+delete process.env.TRUST_PROXY;
+
 // express-static-gzip indexes the dist directory when the app is required, so
 // fixtures must exist on disk before `require("../server")` runs below.
 const distDir = path.join(__dirname, "..", "dist");
@@ -53,6 +57,11 @@ describe("health check", () => {
     const res = await request(app).get("/");
     assert.equal(res.status, 200);
     assert.deepEqual(res.body, { status: "UP" });
+  });
+
+  test("GET / is never cached, so a CDN cannot keep serving a stale UP", async () => {
+    const res = await request(app).get("/");
+    assert.equal(res.headers["cache-control"], "no-store");
   });
 });
 
@@ -122,6 +131,19 @@ describe("error handling", () => {
     assert.equal(res.status, 404);
     assert.match(res.text, /Cannot find/);
   });
+
+  test("the 404 view says the page was not found, in its title and heading", async () => {
+    const res = await request(app).get("/does-not-exist");
+    assert.match(res.text, /<title>Not Found<\/title>/);
+    assert.match(res.text, /<h1>Page not found<\/h1>/);
+    assert.match(res.text, /Cannot find \/does-not-exist/);
+  });
+});
+
+describe("proxy trust", () => {
+  test("trusts no proxy by default, as a number rather than a string", () => {
+    assert.strictEqual(app.get("trust proxy"), 0);
+  });
 });
 
 describe("security headers", () => {
@@ -140,6 +162,12 @@ describe("500 view", () => {
     const html = await ejs.renderFile(viewPath, { error, settings: { "verbose errors": false } });
     assert.doesNotMatch(html, /sensitive internal detail/);
     assert.doesNotMatch(html, /somewhere/);
+  });
+
+  test("renders without title data and keeps a generic title and one heading", async () => {
+    const html = await ejs.renderFile(viewPath, { error, settings: { "verbose errors": false } });
+    assert.match(html, /<title>Error<\/title>/);
+    assert.equal(html.match(/An error occurred!/g).length, 1);
   });
 
   test("includes the error message and stack when verbose errors is on", async () => {

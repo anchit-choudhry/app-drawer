@@ -28,7 +28,8 @@ into a repeatable process. Covers the npm workspace as a whole - there is only o
    `min-release-age=7`, so releases under 7 days old are skipped; for an urgent security fix, add
    `--min-release-age=0` to that one command and tell the user why.
 6. **Audit**: Run `npm audit`. If vulnerabilities remain, run `npm audit fix` - never
-   `npm audit fix --force`, per CLAUDE.md. `braces` is expected to remain (no fix exists).
+   `npm audit fix --force`, per CLAUDE.md. `braces` has no fix and is still installed through
+   `pm2`, though `npm audit` no longer reports it.
 7. **Review overrides**: The root `package.json` `overrides` (`js-yaml`, `basic-ftp`) exist only
    because `pm2` pins vulnerable transitive versions (see CLAUDE.md, "Transitive vulnerability
    overrides"). If the update moved `pm2`, check with `npm view pm2@<version> dependencies` and

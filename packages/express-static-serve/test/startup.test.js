@@ -5,6 +5,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const zlib = require("node:zlib");
 
+// A TRUST_PROXY exported in the developer's shell must not change what these tests start.
+delete process.env.TRUST_PROXY;
+
 const distDir = path.join(__dirname, "..", "dist");
 const serverPath = path.join(__dirname, "..", "server.js");
 

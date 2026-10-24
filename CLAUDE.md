@@ -12,10 +12,12 @@ compression negotiation and security headers.
 ## Layout
 
 - `packages/express-static-serve/`: the only package. `server.js` (app and startup),
-  `ecosystem.config.js` (PM2), `scripts/` (dist tooling), `views/` (404/500), `test/`.
+  `trust-proxy.js` (`TRUST_PROXY` parser), `ecosystem.config.js` (PM2), `scripts/` (dist
+  tooling), `views/` (404/500), `test/`.
 - `.claude/`: hooks, skills, agents, rules. `.gemini/` and `GEMINI.md` mirror this file for
   Gemini CLI; keep them in sync when invariants change.
 - `.github/`: workflows, Dependabot, labeler, issue templates, `SECURITY.md`.
+- `docs/superpowers/`: design specs and implementation plans for larger changes.
 
 ## Architecture
 
@@ -25,7 +27,10 @@ compression negotiation and security headers.
   the final error-handling middleware in `server.js`. `app.set("verbose errors", ...)` controls
   whether `500.ejs` includes the error message and stack trace; it fails closed and is only enabled
   when `NODE_ENV=development`. The error is always logged server-side via `console.error`
-  regardless of this setting.
+  regardless of this setting. PM2 starts workers with `NODE_ENV=production` (the `env` block in
+  `ecosystem.config.js`), so details show only under `NODE_ENV=development node server.js`, or
+  after a reload by app name with `--update-env` from a shell that exports it (README section
+  "Running under PM2").
 - **PM2 shutdown window:** `ecosystem.config.js` `kill_timeout` must stay above
   `SHUTDOWN_TIMEOUT_MS` in `server.js`, otherwise PM2 SIGKILLs workers that are still draining
   requests. `test/ecosystem.test.js` enforces this.
@@ -44,10 +49,17 @@ compression negotiation and security headers.
   add a build step without asking. `GET /` is the health check, so the root `index.html` is only
   reachable at `/index.html` (a subfolder serves its own at `/sub/`), and there is no SPA fallback:
   unknown paths return the 404 page. `express-static-gzip` lists compressed variants once at
-  startup, so after changing `dist/` run `prepare-dist` and reload the PM2 workers. README section
-  "Providing `dist/`" is the user-facing version.
-- **Trust proxy:** `app.set("trust proxy", 1)` - the server expects exactly one reverse
-  proxy/CDN hop in front of it. Update this if the deployment topology changes.
+  startup, so after changing `dist/` run `prepare-dist` and reload the PM2 workers from the
+  ecosystem file (never by app name with `--update-env`; README section "Running under PM2").
+  README section "Providing `dist/`" is the user-facing version.
+- **Trust proxy:** `app.set("trust proxy", ...)` takes the `TRUST_PROXY` environment variable,
+  parsed by `parseTrustProxy` in `trust-proxy.js`. It defaults to `0` (no proxy trusted); set `1`
+  for exactly one reverse proxy/CDN hop. Only an unset or empty value, or a whole number from 0 to
+  10, is accepted; anything else (`true`, `loopback`, spaces, larger numbers) throws. `server.js`
+  and `ecosystem.config.js` both parse it, so a bad value stops `pm2 start` and a reload from the
+  ecosystem file before any worker changes. Anything else that loads `server.js` or
+  `ecosystem.config.js` in a shell with a bad value fails the same way; the tests clear the
+  variable themselves. Only the Morgan access log reads the client IP.
 
 ## Commands
 
@@ -70,7 +82,7 @@ All three need Node 22.15+ (`zlib.zstdCompressSync`).
 Run and test:
 
 - `node packages/express-static-serve/server.js` starts one process on `PORT` (default 3000).
-  `PORT`, `NODE_ENV`, and `VERIFY_DIST_ON_START` are tabled in the README.
+  `PORT`, `NODE_ENV`, `TRUST_PROXY`, and `VERIFY_DIST_ON_START` are tabled in the README.
 - `npm run logs:express-static-serve` shows the PM2 logs.
 - One test file: `node --test packages/express-static-serve/test/server.test.js`.
 
@@ -85,7 +97,10 @@ Other non-default project configuration:
   the app by name, `express-static-serve`.
 
 The `express-static-serve` tests create and remove their own `dist/` fixtures, so no pre-built
-`dist/` is needed to run them.
+`dist/` is needed to run them. The test files share those fixtures, so run them through
+`npm test`, which passes `--test-concurrency=1`; a bare concurrent `node --test` races. A leftover
+`dist/` (for example from a crashed run) makes the startup, runtime-hardening, and `prepare-dist`
+default tests skip silently, so delete it if the skipped count is not 0.
 
 ## CI/CD
 
@@ -113,12 +128,15 @@ The `express-static-serve` tests create and remove their own `dist/` fixtures, s
   `^5.0.2`); that chain only uses it for `ftp:` proxy-config URLs. Remove it once `get-uri` allows a
   fixed version. After changing an override, apply it with `npm update <pkg>`; deleting the
   package's lockfile entry instead leaves it uninstalled and breaks `require("get-uri")`.
-  `braces` (all versions affected, no fix exists) remains in `npm audit`.
+  `braces` (all versions affected, no fix exists) is still installed through `pm2`; `npm audit`
+  stopped reporting it on 2026-10-24, but the Trivy and OSV exceptions stay until re-reviewed.
 - **GitHub Actions policy:** Every `uses:` is pinned to a full commit SHA with its tag in a
   trailing comment (Dependabot updates both), and every workflow declares top-level `permissions:
   contents: read`, with wider grants only at job level. The long pinned lines exceed 100
   characters, which the YAML linter only warns about. `.github/workflows/ci.yml` runs `npm ci`,
-  `test:coverage`, and `audit:signatures` on Node 22.15.0 and 24. Every `actions/checkout` sets
+  `test:coverage`, and `audit:signatures` on Node 22.15.0 and 24, under a `concurrency` group that
+  cancels superseded pull request runs but never a run on `main`. `njsscan.yml` no longer ends in
+  `|| true`, so its findings fail the job. Every `actions/checkout` sets
   `persist-credentials: false`, and no `run:` script may contain a `${{ }}` expression: event
   fields and step outputs (an issue body, a model's reply) can be attacker-controlled, so pass
   them through `env:` and quote the variable. Dependabot waits 7 days (`cooldown`) before
@@ -185,7 +203,7 @@ invariants:
 - Hook commands in `.claude/settings.json` can use `$CLAUDE_PROJECT_DIR` to reference the repository
   root - no need for a `git rev-parse --show-toplevel` wrapper.
 - Verify Cache-Control/compression headers by requesting a real file under `dist/`; `GET /`
-  bypasses `setCustomCacheControl`.
+  bypasses `setCustomCacheControl` and sets its own `Cache-Control: no-store`.
 - **Hook input:** hooks read the PreToolUse JSON from stdin through `.claude/lib/hook-input.sh`
   (`HOOK_COMMAND`, `HOOK_FILE_PATH`). Never read `CLAUDE_TOOL_INPUT`: Claude Code does not set it,
   so a hook that does is a silent no-op. Block messages go to stderr with exit 2. Test a hook by

@@ -31,17 +31,20 @@ check the actual diff or file content against each one:
 6. **Error handling**: `app.set("verbose errors", ...)` must stay enabled only when
    `NODE_ENV=development` (fails closed), `views/500.ejs` may show `error.message` and
    `error.stack` only inside that setting, and the error must still be logged server-side via
-   `console.error`. `test/error-handler.test.js` covers the handler's status and
-   `res.headersSent` behavior.
+   `console.error`. Flag removing `env: { NODE_ENV: "production" }` from `ecosystem.config.js`,
+   which keeps a stray `NODE_ENV=development` in the launching shell from enabling it.
+   `test/error-handler.test.js` covers the handler's status and `res.headersSent` behavior.
 7. **PM2 shutdown window**: `kill_timeout` in `ecosystem.config.js` must stay above
    `SHUTDOWN_TIMEOUT_MS` in `server.js`; `test/ecosystem.test.js` enforces it.
 8. **PM2 worker flags**: `node_args` must stay `--disable-proto=delete` only. Flag `--permission`
    (it crashes PM2 cluster workers) and `--allow-inspector` (it lets a worker bypass the
    permission model's restrictions).
-9. **Trust proxy and health check**: `app.set("trust proxy", 1)` assumes exactly one reverse
-   proxy or CDN hop; flag `true` or a larger number without a documented topology change.
-   `GET /` is the health check and must stay a route before the static handler, and unknown paths
-   must still return the 404 page (no SPA fallback).
+9. **Trust proxy and health check**: `app.set("trust proxy", ...)` must take its value from
+   `parseTrustProxy` in `trust-proxy.js` (a Number from 0 to 10, default 0), and
+   `ecosystem.config.js` must keep validating it with the same function. Flag a literal `true`, a
+   string value, a larger cap, or any trimming or fallback for a bad value. `GET /` is the health
+   check, sends `Cache-Control: no-store`, and must stay a route before the static handler, and
+   unknown paths must still return the 404 page (no SPA fallback).
 
 Report findings as a short list: file, line if applicable, which invariant is violated, and the
 concrete fix. If nothing is wrong, say so briefly - do not pad the review with restated context.

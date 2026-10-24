@@ -6,8 +6,9 @@ const path = require("path");
 // Below this size the variant saves too little to justify the extra file.
 const MIN_SIZE_BYTES = 1024;
 
-// Formats that compress well. Images, video, fonts (woff2), and archives are already
-// compressed, so recompressing them wastes CPU and often produces a larger file.
+// Formats that compress well. Images, video, woff/woff2 fonts, and archives are already
+// compressed, so recompressing them wastes CPU and often produces a larger file. The raw font
+// formats (ttf, otf, eot) are not, so they are listed.
 const COMPRESSIBLE_EXTENSIONS = new Set([
   ".html",
   ".htm",
@@ -23,6 +24,9 @@ const COMPRESSIBLE_EXTENSIONS = new Set([
   ".wasm",
   ".ico",
   ".csv",
+  ".ttf",
+  ".otf",
+  ".eot",
 ]);
 
 // Per-encoding effort, keyed by the file extension express-static-gzip matches on.

@@ -1,9 +1,19 @@
 {
   "name": "express-static-serve",
+  "private": true,
   "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
+  "description": "Express server for pre-built static assets with compression and security headers",
+  "license": "Apache-2.0",
+  "author": "anchit-choudhry",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anchit-choudhry/app-drawer.git",
+    "directory": "packages/express-static-serve"
+  },
+  "bugs": {
+    "url": "https://github.com/anchit-choudhry/app-drawer/issues"
+  },
+  "homepage": "https://github.com/anchit-choudhry/app-drawer#readme",
   "type": "commonjs",
   "main": "server.js",
   "scripts": {

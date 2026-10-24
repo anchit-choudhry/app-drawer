@@ -2,11 +2,17 @@
   "name": "app-drawer",
   "private": true,
   "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
-  "main": "index.js",
-  "keywords": [],
+  "description": "Monorepo for Node-based applications",
+  "license": "Apache-2.0",
+  "author": "anchit-choudhry",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anchit-choudhry/app-drawer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/anchit-choudhry/app-drawer/issues"
+  },
+  "homepage": "https://github.com/anchit-choudhry/app-drawer#readme",
   "scripts": {
     "test": "npm test --workspaces --if-present",
     "start:express-static-serve": "pm2 start packages/express-static-serve/ecosystem.config.js",

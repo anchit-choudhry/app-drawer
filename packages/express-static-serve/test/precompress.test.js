@@ -44,6 +44,15 @@ describe("compression policy", () => {
     assert.equal(shouldCompress("style.css", 5000), true);
   });
 
+  test("compresses uncompressed font formats but not woff2 or a CommonJS file", () => {
+    for (const name of ["font.ttf", "font.otf", "font.eot"]) {
+      assert.equal(shouldCompress(name, 2048), true, name);
+    }
+    assert.equal(shouldCompress("font.woff2", 2048), false);
+    // Browsers do not run .cjs, so it is not a web asset worth a variant.
+    assert.equal(shouldCompress("app.cjs", 2048), false);
+  });
+
   test("skips formats that are already compressed", () => {
     assert.equal(shouldCompress("photo.png", 500000), false);
     assert.equal(shouldCompress("clip.mp4", 500000), false);

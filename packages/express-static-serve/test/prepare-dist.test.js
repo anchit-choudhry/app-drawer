@@ -38,6 +38,18 @@ describe("prepare-dist command line", () => {
     assert.match(result.stderr, /index\.html/);
   });
 
+  // With no argument the script works on the package's real dist/, so this only runs when
+  // dist/ is absent, where it fails before writing anything.
+  test(
+    "defaults to the package dist directory when no argument is given",
+    { skip: fs.existsSync(path.join(__dirname, "..", "dist")) && "dist/ exists, would write" },
+    () => {
+      const result = spawnSync(process.execPath, [script], { encoding: "utf8" });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /dist is not a directory/);
+    }
+  );
+
   test("exits 1 without verifying when the directory does not exist", () => {
     const result = run(path.join(workDir, "missing"));
     assert.equal(result.status, 1);

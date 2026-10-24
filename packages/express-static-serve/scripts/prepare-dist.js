@@ -1,10 +1,10 @@
-const path = require("path");
+const { resolveDistDir, reportVerification } = require("./dist-common");
 const { precompress, formatSummary } = require("./precompress");
 const { verifyDist } = require("./verify-dist");
 
 // One step for the whole post-build routine: compress, then verify what was written.
 // Verification runs after compression on purpose, so it also checks the fresh variants.
-const dir = path.resolve(process.argv[2] || path.join(__dirname, "..", "dist"));
+const dir = resolveDistDir(process.argv[2]);
 
 try {
   console.log(formatSummary(precompress(dir), dir));
@@ -13,13 +13,6 @@ try {
   process.exit(1);
 }
 
-const { ok, problems } = verifyDist(dir);
-if (ok) {
-  console.log(`dist OK: ${dir}`);
-} else {
-  console.error(`dist verification failed for ${dir}:`);
-  for (const problem of problems) {
-    console.error(`  - ${problem}`);
-  }
+if (!reportVerification(dir, verifyDist(dir))) {
   process.exit(1);
 }
