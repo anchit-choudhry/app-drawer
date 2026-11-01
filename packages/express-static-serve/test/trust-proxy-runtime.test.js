@@ -1,60 +1,25 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { spawn, spawnSync } = require("node:child_process");
-const http = require("node:http");
+const { spawnSync } = require("node:child_process");
 const path = require("node:path");
+const { startServer, waitForOutput, httpGet } = require("./helpers");
+
+// A TRUST_PROXY exported in the developer's shell must not change what these tests start.
+delete process.env.TRUST_PROXY;
 
 const serverPath = path.join(__dirname, "..", "server.js");
 const socketAddress = /^(::1|(::ffff:)?127\.0\.0\.1) /m;
 
-// Environment for a server process that never inherits the caller's TRUST_PROXY.
-const envWith = (extra, port) => {
-  const env = { ...process.env, ...extra, PORT: String(port) };
-  if (!("TRUST_PROXY" in extra)) {
-    delete env.TRUST_PROXY;
-  }
-  return env;
-};
-
-const requestRoot = (port, headers) =>
-  new Promise((resolve, reject) => {
-    http
-      .get({ host: "127.0.0.1", port, path: "/", headers }, (res) => {
-        res.resume();
-        res.on("end", resolve);
-      })
-      .on("error", reject);
-  });
-
 // Starts the real server, sends one request, and returns what Morgan logged for it. Morgan only
 // reads the client IP, so its access line is where the trust setting becomes visible.
-async function accessLogFor(extraEnv, port, headers) {
-  const child = spawn(process.execPath, [serverPath], { env: envWith(extraEnv, port) });
-  let stdout = "";
-  child.stdout.on("data", (chunk) => (stdout += chunk));
-  const waitFor = (pattern, what) =>
-    new Promise((resolve, reject) => {
-      const deadline = Date.now() + 5000;
-      const poll = setInterval(() => {
-        if (pattern.test(stdout)) {
-          clearInterval(poll);
-          resolve();
-        } else if (Date.now() > deadline) {
-          clearInterval(poll);
-          reject(new Error(`${what} did not appear:\n${stdout}`));
-        }
-      }, 25);
-    });
-
+async function accessLogFor(env, port, headers) {
+  const server = await startServer({ port, env });
   try {
-    await waitFor(/Server Established/, "startup line");
-    await requestRoot(port, headers);
-    await waitFor(/"GET \/ HTTP/, "access log line");
-    return stdout;
+    await httpGet(port, "/", headers);
+    await waitForOutput(server, /"GET \/ HTTP/, "the access log line");
+    return server.stdout;
   } finally {
-    const exited = new Promise((resolve) => child.once("exit", resolve));
-    child.kill("SIGTERM");
-    await exited;
+    await server.stop();
   }
 }
 
@@ -75,7 +40,7 @@ describe("TRUST_PROXY at runtime", () => {
 
   test("a bad value stops the server before it listens and names the value", () => {
     const result = spawnSync(process.execPath, [serverPath], {
-      env: envWith({ TRUST_PROXY: "true" }, 34582),
+      env: { ...process.env, TRUST_PROXY: "true", PORT: "34582" },
       encoding: "utf8",
       timeout: 5000,
     });

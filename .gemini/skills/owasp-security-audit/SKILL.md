@@ -1,7 +1,6 @@
 ---
 name: owasp-security-audit
-description: OWASP Top 10:2025 security checklist and secure coding patterns, referring to the
-  full skill in .claude/skills/owasp-security-audit/SKILL.md.
+description: Provides comprehensive security standards and checklists based on OWASP Top 10:2025. Includes language-specific secure coding patterns for 20+ languages, guidance on Agentic AI security, and ASVS 5.0 requirements, referring to the full skill in .claude/skills/owasp-security-audit/SKILL.md.
 ---
 
 # OWASP Security Audit Skill

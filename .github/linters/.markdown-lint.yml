@@ -1,0 +1,40 @@
+---
+# markdownlint rules for super-linter. The file must be named `.markdown-lint.yml`: super-linter
+# ignores `.markdownlint.yml`, which is the name this file used to have, so these settings were
+# never applied. The rules below start from super-linter's own defaults.
+
+# MD004/ul-style: either bullet marker is fine.
+MD004: false
+
+# MD007/ul-indent
+MD007:
+  indent: 2
+
+# MD013/line-length
+# Line length : https://github.com/DavidAnson/markdownlint/blob/v0.38.0/doc/md013.md
+# EditorConfig enforces the stricter 100 character limit for prose; this only catches extremes.
+MD013:
+  # Number of characters
+  line_length: 250
+
+# MD024/no-duplicate-heading
+# Repeated headings are fine under different parents (the security skills repeat "Protection
+# Strategies" per vulnerability class); only identical sibling headings are an error.
+MD024:
+  siblings_only: true
+
+# MD026/no-trailing-punctuation
+MD026:
+  punctuation: ".,;:!。，；:"
+
+# MD029/ol-prefix: lazy (1. 1. 1.) and sequential numbering are both used.
+MD029: false
+
+# MD033/no-inline-html
+MD033: false
+
+# MD036/no-emphasis-as-heading
+MD036: false
+
+# Error on blank lines
+blank_lines: false

@@ -23,14 +23,14 @@ headers. This repo does not build `dist/` by design; it is populated externally,
 logs a warning at startup when it is missing. After populating it, run `prepare-dist` to create the
 compressed variants and check the result (see "Providing `dist/`" below).
 
-Requires Node 22.15 or later (`.nvmrc` pins 24).
+Requires Node 26 or later (`.nvmrc` pins 26).
 
-| Variable               | Default | Purpose                                                                  |
-| ---------------------- | ------- | ------------------------------------------------------------------------ |
-| `PORT`                 | `3000`  | HTTP port                                                                |
-| `NODE_ENV`             | unset   | `development` shows error details on the 500 page; PM2 sets `production` |
-| `TRUST_PROXY`          | `0`     | Reverse proxy hops to trust, 0 to 10; see "Running under PM2"            |
-| `VERIFY_DIST_ON_START` | unset   | `true` runs `verify-dist` at startup and logs problems                   |
+| Variable               | Default | Purpose                                                     |
+| ---------------------- | ------- | ----------------------------------------------------------- |
+| `PORT`                 | `3000`  | HTTP port                                                   |
+| `NODE_ENV`             | unset   | `development` shows 500 page details; PM2 sets `production` |
+| `TRUST_PROXY`          | `0`     | Proxy hops to trust, 0 to 10; see "Running under PM2"       |
+| `VERIFY_DIST_ON_START` | unset   | `true` runs `verify-dist` at startup and logs problems      |
 
 ```bash
 npm ci
@@ -69,17 +69,41 @@ To change it, reload from the ecosystem file, which PM2 reads again:
 TRUST_PROXY=1 npx pm2 reload packages/express-static-serve/ecosystem.config.js --update-env
 ```
 
-Checked against PM2 7.0.4:
+Checked by running PM2 7.1.1 (the last bullet was first seen on 7.0.4):
 
 - A bad `TRUST_PROXY` on `pm2 start` or on a reload from the file stops in the terminal with an
   error naming the value. On a reload, the running workers are left alone.
 - Reloading from the file with `TRUST_PROXY` unset sets it back to `0`.
 - Workers keep `NODE_ENV=production` when the file is reloaded, even if your shell has exported
   `NODE_ENV=development`.
+- A reload from the file applies only the file's `env` block (`NODE_ENV` and `TRUST_PROXY`). A
+  `PORT` or `VERIFY_DIST_ON_START` exported for the reload did not reach the workers, and a `PORT`
+  given to `pm2 start` was gone after the first reload, so a non-default `PORT` does not survive a
+  reload.
 - **Do not reload by app name together with `--update-env`.** That form skips the file and hands
   your shell environment to the workers. A shell with `NODE_ENV=development` then turned error
   details on, and a bad `TRUST_PROXY` left every worker in the `errored` state, which is an
   outage.
+
+### Running in Docker
+
+The `Dockerfile` runs the server as one plain `node` process, as the non-root `node` user, with
+`NODE_ENV=production` and `PORT=3000`. `dist/` is not part of the image: mount it read-only.
+
+```bash
+docker build -t app-drawer .
+docker run --init -p 3000:3000 \
+  -v "$PWD/packages/express-static-serve/dist:/app/packages/express-static-serve/dist:ro" \
+  app-drawer
+```
+
+- Behind a proxy, add `-e TRUST_PROXY=1`. The value is parsed as strictly as under PM2, and a bad
+  one stops the container at startup.
+- There is one process per container and no PM2: run more containers (or let the platform restart
+  them) for more capacity.
+- The image has a health check that requests `GET /`, which answers even without `dist/`.
+- The server lists the compressed variants once at startup, so after changing `dist/` run
+  `prepare-dist` and restart the container.
 
 ### Providing `dist/`
 
