@@ -60,7 +60,7 @@ describe("PM2 worker runtime hardening", () => {
   });
 
   test("does not enable Node's permission model, which breaks PM2 cluster workers", () => {
-    // Verified against PM2 7.0.4 on Node 24: workers crash at startup with ERR_ACCESS_DENIED
+    // Verified against PM2 7.0.4 on Node 24 and 26: workers crash at startup with ERR_ACCESS_DENIED
     // for the inspector API, and the only fix (--allow-inspector) lets a worker bypass the
     // model's restrictions, so enabling it here would add risk without adding isolation.
     const permissionFlags = nodeArgs.filter((arg) => /^--(permission|allow-)/.test(arg));

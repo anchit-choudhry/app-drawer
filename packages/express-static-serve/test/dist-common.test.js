@@ -54,7 +54,10 @@ describe("reportVerification", () => {
     const log = mock.method(console, "log", () => {});
     const error = mock.method(console, "error", () => {});
     assert.equal(reportVerification("/d", { ok: true, problems: [] }), true);
-    assert.deepEqual(log.mock.calls.map((call) => call.arguments), [["dist OK: /d"]]);
+    assert.deepEqual(
+      log.mock.calls.map((call) => call.arguments),
+      [["dist OK: /d"]]
+    );
     assert.equal(error.mock.callCount(), 0);
   });
 
