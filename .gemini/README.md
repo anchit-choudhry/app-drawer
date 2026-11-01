@@ -14,6 +14,7 @@ counterparts in the `.claude/` directory.
 - **Skills:** See [.gemini/skills/](skills/dependency-update/SKILL.md)
   (Mirrors [.claude/skills/](../.claude/skills/))
 - **Hooks:** See [.gemini/hooks/](hooks/README.md) (References [.claude/hooks/](../.claude/hooks/))
+- **Rules:** See [.gemini/rules/](rules/markdown.md) (Mirrors [.claude/rules/](../.claude/rules/))
 
 ## Project Guidance
 

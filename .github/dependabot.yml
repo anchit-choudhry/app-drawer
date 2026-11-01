@@ -14,6 +14,18 @@ updates:
     # Security updates ignore the cooldown.
     cooldown:
       default-days: 7
+    # One pull request for all minor and patch bumps; major bumps stay separate for review.
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

@@ -13,7 +13,8 @@ compression negotiation and security headers.
 
 - `packages/express-static-serve/`: the only package. `server.js` (app and startup),
   `trust-proxy.js` (`TRUST_PROXY` parser), `ecosystem.config.js` (PM2), `scripts/` (dist
-  tooling), `views/` (404/500), `test/`.
+  tooling), `views/` (404/500), `test/`. `Dockerfile` and `.dockerignore` at the root build its
+  image.
 - `.claude/`: hooks, skills, agents, rules. `.gemini/` and `GEMINI.md` mirror this file for
   Gemini CLI; keep them in sync when invariants change.
 - `.github/`: workflows, Dependabot, labeler, issue templates, `SECURITY.md`.
@@ -35,10 +36,20 @@ compression negotiation and security headers.
   `SHUTDOWN_TIMEOUT_MS` in `server.js`, otherwise PM2 SIGKILLs workers that are still draining
   requests. `test/ecosystem.test.js` enforces this.
 - **PM2 worker flags:** `node_args` in `ecosystem.config.js` is `--disable-proto=delete` only. Do
-  not add `--permission`: PM2 7.0.4 cluster workers crash at startup with `ERR_ACCESS_DENIED` for
-  the inspector API, and `--allow-inspector` would let a worker bypass the model's restrictions.
-  `test/ecosystem.test.js` enforces this, and `test/runtime-hardening.test.js` boots the server
-  with these exact flags.
+  not add `--permission`: PM2 7.0.4 and 7.1.1 cluster workers crash at startup with
+  `ERR_ACCESS_DENIED` for the inspector API (checked on both), and
+  `--allow-inspector` would let a worker bypass the model's restrictions. `test/ecosystem.test.js`
+  enforces this, and `test/runtime-hardening.test.js` boots the server with these exact flags.
+- **PM2 reload environment:** a reload from the ecosystem file applies only the file's `env` block
+  (`NODE_ENV`, `TRUST_PROXY`). Exported `PORT` and `VERIFY_DIST_ON_START` do not reach the
+  workers, and a `PORT` given at `pm2 start` is dropped by the first reload. Checked by running
+  PM2 7.1.1 (README section "Running under PM2").
+- **Docker image:** the `Dockerfile` runs `node --disable-proto=delete server.js` directly as the
+  `node` user, with no PM2, on the Node major in `.nvmrc`. `dist/` is mounted at runtime and never
+  copied in, which keeps the external `dist/` contract. `test/container-image.test.js` enforces
+  the base image, the non-root user, no `dist/` in `COPY`, no `--permission`, and the health
+  check. The image was built and run with a mounted `dist/` on 2026-10-31 (non-root, healthy,
+  SIGTERM exit 0).
 - **Missing `dist/`:** the server still starts and `GET /` still reports `UP`; only the startup
   warning and 404s on every other path reveal a bad deploy. Startup problems are reported by PM2
   instance 0 only (`NODE_APP_INSTANCE`), so a cluster logs them once. Set
@@ -77,7 +88,7 @@ or pass a directory), run via `npm run <script> --workspace=express-static-serve
   match their source.
 - `prepare-dist` runs `precompress` and then `verify-dist`; use it as the single post-build step.
 
-All three need Node 22.15+ (`zlib.zstdCompressSync`).
+All three need `zlib.zstdCompressSync`, which the Node 26 requirement covers.
 
 Run and test:
 
@@ -88,7 +99,7 @@ Run and test:
 
 Other non-default project configuration:
 
-- Both `package.json` files declare `engines.node` as `>=22.15.0`; `.nvmrc` pins Node 24.
+- Both `package.json` files declare `engines.node` as `>=26.0.0`; `.nvmrc` pins Node 26.
 - The root `npm test` runs every workspace's tests (`npm test --workspaces --if-present`).
   `npm run test:coverage --workspace=express-static-serve` prints a coverage report and fails
   below 95% lines, 90% branches, or 85% functions.
@@ -119,28 +130,25 @@ default tests skip silently, so delete it if the skipped count is not 0.
   `https://registry.npmjs.org/` with integrity hashes and no git, file, or URL dependency specs.
 - **Lockfile integrity:** If `package-lock.json` is missing `resolved`/`integrity` fields, `npm
   install` alone won't fix it while `node_modules` still exists - remove both first.
-- **Transitive vulnerability overrides:** The root `package.json` pins `js-yaml` to `4.3.2` via
-  `overrides` because `pm2` pins an exact vulnerable `js-yaml@4.3.1` (GHSA-2883-xcg3-v3hh) and has
-  no looser range to update into. This avoids `npm audit fix --force`, which would otherwise
-  downgrade `pm2` from `7.0.4` to `5.3.1`. Remove the override once `pm2` bumps its own `js-yaml`
-  dependency past `4.3.1`. The same file pins `basic-ftp` to `6.2.1`, the first release outside its
-  vulnerable range (`<=6.2.0`), which `pm2` reaches through `proxy-agent` and `get-uri` (declared as
-  `^5.0.2`); that chain only uses it for `ftp:` proxy-config URLs. Remove it once `get-uri` allows a
-  fixed version. After changing an override, apply it with `npm update <pkg>`; deleting the
-  package's lockfile entry instead leaves it uninstalled and breaks `require("get-uri")`.
-  `braces` (all versions affected, no fix exists) is still installed through `pm2`; `npm audit`
-  stopped reporting it on 2026-10-24, but the Trivy and OSV exceptions stay until re-reviewed.
+- **Transitive vulnerability overrides:** none today. `pm2` 7.1.1 pins `js-yaml` 4.3.2 itself and
+  no longer depends on `chokidar` (`braces`) or `proxy-agent` (`get-uri`, `basic-ftp`), so the
+  `js-yaml` and `basic-ftp` overrides and the `braces` Trivy and OSV exceptions were removed on
+  2026-10-31. If an advisory needs one again, pin the fixed version under `overrides` in the root
+  `package.json` and apply it with `npm update <pkg>`; deleting a package's lockfile entry instead
+  leaves it uninstalled.
 - **GitHub Actions policy:** Every `uses:` is pinned to a full commit SHA with its tag in a
   trailing comment (Dependabot updates both), and every workflow declares top-level `permissions:
   contents: read`, with wider grants only at job level. The long pinned lines exceed 100
   characters, which the YAML linter only warns about. `.github/workflows/ci.yml` runs `npm ci`,
-  `test:coverage`, and `audit:signatures` on Node 22.15.0 and 24, under a `concurrency` group that
-  cancels superseded pull request runs but never a run on `main`. `njsscan.yml` no longer ends in
+  `test:coverage`, and `audit:signatures` on the Node version in `.nvmrc` (26, also the `engines`
+  floor), under a `concurrency` group that cancels superseded pull request runs but never a run
+  on `main`. `njsscan.yml` no longer ends in
   `|| true`, so its findings fail the job. Every `actions/checkout` sets
   `persist-credentials: false`, and no `run:` script may contain a `${{ }}` expression: event
   fields and step outputs (an issue body, a model's reply) can be attacker-controlled, so pass
   them through `env:` and quote the variable. Dependabot waits 7 days (`cooldown`) before
-  proposing a version, matching `min-release-age`. `test/supply-chain.test.js` enforces the
+  proposing a version, matching `min-release-age`, and groups npm minor and patch bumps into one
+  pull request. `test/supply-chain.test.js` enforces the
   pinning, the permissions, both checkout and `run:` rules, Dependabot's `github-actions` entry,
   and `ci.yml`.
 - **Linting scope:** `super-linter` (the `super-linter/super-linter/slim` action, pinned to a
@@ -151,8 +159,9 @@ default tests skip silently, so delete it if the skipped count is not 0.
   `.editorconfig-checker.json`, `.jscpd.json`, `.textlintrc`, `.codespellrc`, `.yaml-lint.yml`,
   and `zizmor.yaml`. Prettier reads the root `.prettierrc.json` and `.prettierignore` (Markdown is
   ignored there). Biome is switched off in the workflow because it conflicts with Prettier and
-  ESLint; setting `VALIDATE_<LINTER>: false` only disables that one. `.trivyignore` holds the
-  expiring `braces` exception (no fixed release exists); remove it once one is published.
+  ESLint; setting `VALIDATE_<LINTER>: false` only disables that one. The `braces` exceptions
+  (`.trivyignore`, `osv-scanner.toml`) were removed with the `pm2` 7.1.1 upgrade; add one back only
+  for an advisory with no fixed release, and give it an expiry.
 - **Run super-linter locally:** it needs Docker, an `amd64` image, and a clean tree because it
   reads tracked files only, so stage new files first (`git add -N`) or add
   `-e USE_FIND_ALGORITHM=true`, which cannot be combined with `DEFAULT_BRANCH`:
@@ -214,9 +223,7 @@ invariants:
 - **Protected files:** `block-hook-edit.sh` blocks Edit/Write on `.claude/settings.json`,
   `.gemini/settings.json`, and `hooks/*.sh`. Describe the exact change and the user applies it;
   `.claude/lib/` is deliberately outside that glob. `block-git-commit.sh` likewise blocks
-  `git commit` from the session, which enforces Commit Safety above. For pending changes to those
-  files, `node .claude/lib/apply-hardening.js` (add `--dry-run` to preview) applies them
-  idempotently and verifies the result; extend its steps instead of hand-editing the hooks.
+  `git commit` from the session, which enforces Commit Safety above.
 - **Personal sound hook:** `.claude/hooks/notification-alert.sh` plays a macOS sound on
   notifications. It is git-ignored and registered in the git-ignored `.claude/settings.local.json`,
   not in the shared `settings.json`; the same script step creates that registration.

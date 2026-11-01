@@ -1,0 +1,16 @@
+# Keep the build context small and never bake local state or dist/ into the image.
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+.claude
+.gemini
+.idea
+.remember
+.superpowers
+.DS_Store
+docs
+packages/express-static-serve/test
+packages/express-static-serve/ecosystem.config.js
+*.md
