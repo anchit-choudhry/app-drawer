@@ -8,7 +8,7 @@
     "testfiles",
     "^LICENSE$",
     "^CODE_OF_CONDUCT\\.md$",
-    "^\\.claude/skills/(owasp|web)-security-audit/SKILL\\.md$"
+    "^\\.(claude|gemini)/skills/(owasp|web)-security-audit/SKILL\\.md$"
   ],
   "AllowedContentTypes": [],
   "PassedFiles": [],

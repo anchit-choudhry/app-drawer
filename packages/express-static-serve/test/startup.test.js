@@ -1,15 +1,14 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
-const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const zlib = require("node:zlib");
+const { startServer } = require("./helpers");
 
 // A TRUST_PROXY exported in the developer's shell must not change what these tests start.
 delete process.env.TRUST_PROXY;
 
 const distDir = path.join(__dirname, "..", "dist");
-const serverPath = path.join(__dirname, "..", "server.js");
 
 // A pre-built production dist/ (per CLAUDE.md) must never be touched by tests, so these
 // scenarios only run when dist/ is genuinely absent.
@@ -20,33 +19,9 @@ const page = "<!doctype html><title>app</title>\n".repeat(60);
 
 // Starts the real server, waits until it is listening, stops it, and returns its output.
 async function runServer(env, port) {
-  const child = spawn(process.execPath, [serverPath], {
-    env: { ...process.env, ...env, PORT: String(port) },
-  });
-
-  let stdout = "";
-  let stderr = "";
-  child.stderr.on("data", (chunk) => (stderr += chunk));
-
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("server did not start in time")), 5000);
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-      if (stdout.includes("Server Established")) {
-        clearTimeout(timer);
-        resolve();
-      }
-    });
-    child.once("error", reject);
-    child.once("exit", (code) => {
-      reject(new Error(`server exited early (${code}):\n${stderr}`));
-    });
-  });
-
-  const exited = new Promise((resolve) => child.once("exit", resolve));
-  child.kill("SIGTERM");
-  await exited;
-  return { stdout, stderr };
+  const server = await startServer({ port, env });
+  await server.stop();
+  return { stdout: server.stdout, stderr: server.stderr };
 }
 
 // Runs a scenario against a dist/ it created itself and always removes it afterward.
@@ -131,5 +106,19 @@ describe("opt-in dist verification at startup", { skip }, () => {
       const { stderr } = await runServer(env, 34574);
       assert.doesNotMatch(stderr, /dist verification/);
     });
+  });
+});
+
+describe("shutdown", () => {
+  // A missing dist/ only logs a warning, so this needs no fixture and runs even when a real
+  // dist/ exists.
+  test("SIGTERM shuts the server down gracefully", { timeout: 15000 }, async () => {
+    const server = await startServer({ port: 34567 });
+    try {
+      const result = await server.stop();
+      assert.equal(result.code, 0);
+    } finally {
+      server.child.kill("SIGKILL");
+    }
   });
 });

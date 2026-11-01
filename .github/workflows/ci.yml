@@ -1,7 +1,7 @@
 ---
 # Runs the tests, the coverage gate, and the npm supply-chain checks on every push and pull
-# request to main. Installs strictly from package-lock.json and runs on both the Node version
-# floor declared in package.json (`engines`) and the version pinned in .nvmrc.
+# request to main. Installs strictly from package-lock.json and runs on the Node version pinned
+# in .nvmrc, which is also the floor declared in package.json (`engines`).
 name: CI
 
 on:
@@ -23,20 +23,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: ["22.15.0", "24"]
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
-      - name: Set up Node.js ${{ matrix.node-version }}
+      - name: Set up Node.js from .nvmrc
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: .nvmrc
           cache: npm
 
       # `npm ci` fails if package.json and package-lock.json disagree. The root .npmrc keeps

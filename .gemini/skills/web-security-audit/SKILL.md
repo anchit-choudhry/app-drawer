@@ -1,7 +1,6 @@
 ---
 name: web-security-audit
-description: Bug-hunter style web vulnerability guidance (access control, XSS, CSRF, SSRF,
-  uploads, JWT), referring to the full skill in .claude/skills/web-security-audit/SKILL.md.
+description: Expert guidance on identifying and mitigating common web vulnerabilities from a bug hunter's perspective (access control, XSS, CSRF, SSRF, uploads, JWT), referring to the full skill in .claude/skills/web-security-audit/SKILL.md.
 ---
 
 # Web Security Audit Skill
