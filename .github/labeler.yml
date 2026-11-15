@@ -8,7 +8,16 @@ express-static-serve:
       - any-glob-to-any-file:
           - "packages/express-static-serve/server.js"
           - "packages/express-static-serve/ecosystem.config.js"
+          - "packages/express-static-serve/trust-proxy.js"
+          - "packages/express-static-serve/lib/**"
           - "packages/express-static-serve/views/**"
+
+container:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Dockerfile"
+          - ".dockerignore"
+          - ".github/workflows/container.yml"
 
 scripts:
   - changed-files:
@@ -45,5 +54,6 @@ ai-tooling:
       - any-glob-to-any-file:
           - ".claude/**"
           - ".gemini/**"
+          - "AGENTS.md"
           - "CLAUDE.md"
           - "GEMINI.md"

@@ -1,0 +1,54 @@
+---
+name: Bug report
+description: Report something that does not work as documented
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The request, the setting, or the command that shows it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: The output of `node -v`.
+    validations:
+      required: true
+  - type: dropdown
+    id: how-run
+    attributes:
+      label: How the server runs
+      options:
+        - node
+        - PM2
+        - Docker
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant server log lines or `curl -i` output.
+      render: shell
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Secrets
+      options:
+        - label: This report contains no secrets
+          required: true

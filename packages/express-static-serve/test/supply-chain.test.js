@@ -106,6 +106,20 @@ describe("package metadata", () => {
     assert.equal(root.keywords, undefined);
   });
 
+  // The Docker image installs only the workspace, so a root dependency never reaches it. The
+  // container runs plain node; PM2 is only for running the server on a host.
+  test("pm2 is a root dependency and not a dependency of the workspace package", () => {
+    const groups = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
+    for (const group of groups) {
+      assert.equal(workspace[group]?.pm2, undefined, `workspace ${group} must not list pm2`);
+    }
+    assert.ok(root.dependencies?.pm2, "the root manifest must list pm2 under dependencies");
+  });
+
+  test("the root manifest and the workspace package carry the same version", () => {
+    assert.equal(workspace.version, root.version);
+  });
+
   test("the lockfile records the same license for the root and the workspace", () => {
     assert.equal(lock.packages[""].license, "Apache-2.0");
     assert.equal(lock.packages["packages/express-static-serve"].license, "Apache-2.0");
@@ -140,6 +154,42 @@ function findRunScriptExpressions(workflowText) {
     }
   });
   return found;
+}
+
+// The lines of every `run:` script in a workflow, inline or block, with comments left out.
+function runScriptLines(workflowText) {
+  const lines = workflowText.split("\n");
+  const found = [];
+  lines.forEach((line, index) => {
+    const keyAt = line.search(/\brun:/);
+    if (keyAt === -1 || !/^\s*(-\s+)?run:/.test(line)) {
+      return;
+    }
+    found.push(line.slice(keyAt + "run:".length));
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const body = lines[next];
+      const indent = body.length - body.trimStart().length;
+      if (body.trim() !== "" && indent <= keyAt) {
+        break;
+      }
+      if (!body.trimStart().startsWith("#")) {
+        found.push(body);
+      }
+    }
+  });
+  return found;
+}
+
+// A registry image reference is [host/]owner/name:tag. The optional digest is what pins it. The
+// lookbehind keeps a match from starting inside a path, so a volume mount such as
+// "$RUNNER_TEMP/dist:/app/dist:ro" is not read as the image app/dist:ro.
+const REGISTRY_IMAGE =
+  /(?<![\w./:$-])[a-z0-9.-]+(?:\/[a-z0-9._-]+)+:[A-Za-z0-9][\w.-]*(@sha256:[0-9a-f]{64})?/g;
+function unpinnedImages(scriptLines) {
+  return scriptLines
+    .flatMap((line) => [...line.matchAll(REGISTRY_IMAGE)])
+    .filter((match) => match[1] === undefined)
+    .map((match) => match[0]);
 }
 
 describe("GitHub workflows", () => {
@@ -198,6 +248,53 @@ describe("GitHub workflows", () => {
     assert.deepEqual(findRunScriptExpressions('    run: echo "${{ github.sha }}"'), [1]);
     const safe = '    run: gh issue comment 1 --body "$RESPONSE"';
     assert.deepEqual(findRunScriptExpressions(safe), []);
+  });
+
+  // A job without a timeout runs for six hours when a step hangs. A job that calls a reusable
+  // workflow has no runner of its own, so it has neither line.
+  test("every job that runs on a runner has a timeout", () => {
+    const mismatched = workflows
+      .map(({ file, text }) => ({
+        file,
+        runners: (text.match(/^\s+runs-on:/gm) ?? []).length,
+        timeouts: (text.match(/^\s+timeout-minutes:/gm) ?? []).length,
+      }))
+      .filter(({ runners, timeouts }) => runners !== timeouts)
+      .map(
+        ({ file, runners, timeouts }) =>
+          `${file}: ${runners} runs-on, ${timeouts} timeout-minutes`
+      );
+    assert.deepEqual(mismatched, []);
+  });
+
+  test("every registry image a run script uses is pinned by digest", () => {
+    const offenders = workflows.flatMap(({ file, text }) =>
+      unpinnedImages(runScriptLines(text)).map((image) => `${file}: ${image}`)
+    );
+    assert.deepEqual(offenders, []);
+  });
+
+  test("the image check flags a floating tag and accepts a digest", () => {
+    const digest = `@sha256:${"a".repeat(64)}`;
+    assert.deepEqual(unpinnedImages(["docker run aquasec/trivy:0.76.1 image x"]), [
+      "aquasec/trivy:0.76.1",
+    ]);
+    assert.deepEqual(unpinnedImages([`docker run aquasec/trivy:0.76.1${digest} image x`]), []);
+    assert.deepEqual(unpinnedImages(["docker run ghcr.io/owner/tool:latest"]), [
+      "ghcr.io/owner/tool:latest",
+    ]);
+  });
+
+  test("the image check ignores volume mounts, URLs, and the image the workflow builds", () => {
+    const lines = [
+      '--volume "$RUNNER_TEMP/dist:/app/packages/express-static-serve/dist:ro" app-drawer:ci',
+      "--volume /var/run/docker.sock:/var/run/docker.sock",
+      '--volume "$RUNNER_TEMP/dist:/app/dist:ro"',
+      "curl --silent --fail http://127.0.0.1:3000/",
+      "docker build --tag app-drawer:ci .",
+      "docker inspect --format '{{.State.Health.Status}}' app",
+    ];
+    assert.deepEqual(unpinnedImages(lines), []);
   });
 
   test("Dependabot keeps both npm packages and GitHub Actions up to date", () => {

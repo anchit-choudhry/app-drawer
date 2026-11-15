@@ -1,8 +1,9 @@
-const { parseTrustProxy } = require("./trust-proxy");
+const { loadConfig, toEnv } = require("./lib/config");
 
-// Validated when PM2 loads this file, so a bad TRUST_PROXY stops `pm2 start` in the terminal
-// instead of surfacing as workers that crash in a restart loop.
-const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+// Every supported variable is validated when PM2 loads this file, so a bad value stops
+// `pm2 start` (or a reload from this file) in the terminal instead of surfacing as workers that
+// crash in a restart loop.
+const config = loadConfig(process.env);
 
 module.exports = {
   apps: [
@@ -24,7 +25,7 @@ module.exports = {
       // shell, which would otherwise put error messages and stacks on the 500 page.
       env: {
         NODE_ENV: "production",
-        TRUST_PROXY: String(trustProxy),
+        ...toEnv(config),
       },
     },
   ],

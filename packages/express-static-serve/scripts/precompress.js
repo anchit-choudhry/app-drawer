@@ -1,7 +1,14 @@
 const fs = require("fs");
 const zlib = require("zlib");
 const { shouldCompress, LEVELS } = require("./compression-policy");
-const { listFiles, resolveDistDir } = require("./dist-common");
+const { scanDist, isVariant, resolveDistDir, VARIANT_EXTENSIONS } = require("./dist-common");
+const {
+  sha256,
+  toKey,
+  policyFingerprint,
+  readManifest,
+  writeManifest,
+} = require("./dist-manifest");
 
 // Keyed by the file extension express-static-gzip matches on (see server.js).
 const encoders = {
@@ -16,14 +23,23 @@ const encoders = {
       params: { [zlib.constants.ZSTD_c_compressionLevel]: LEVELS.zst },
     }),
 };
-const variantExtensions = Object.keys(encoders);
 
-function isVariant(file) {
-  return variantExtensions.some((extension) => file.endsWith(`.${extension}`));
+// The last manifest, when it can be trusted to describe the files on disk: it must be valid
+// and written under the same compression policy.
+function loadPrevious(dir) {
+  try {
+    const manifest = readManifest(dir);
+    return manifest && manifest.policy === policyFingerprint() ? manifest : null;
+  } catch {
+    return null;
+  }
 }
 
-function listSourceFiles(dir) {
-  return listFiles(dir).filter((file) => !isVariant(file));
+// True when the variants on disk are exactly the ones the entry lists.
+function variantsMatch(file, entry) {
+  return VARIANT_EXTENSIONS.every(
+    (extension) => fs.existsSync(`${file}.${extension}`) === entry.variants.includes(extension)
+  );
 }
 
 function precompress(dir) {
@@ -31,18 +47,35 @@ function precompress(dir) {
     throw new Error(`${dir} is not a directory`);
   }
 
-  const summary = { compressed: 0, skipped: 0, bytesBefore: 0, bytesAfter: 0 };
+  const previous = loadPrevious(dir);
+  const { files, wellKnownFiles } = scanDist(dir);
+  const summary = { compressed: 0, skipped: 0, unchanged: 0, bytesBefore: 0, bytesAfter: 0 };
+  // No prototype, so a file named __proto__ is recorded like any other instead of being lost.
+  const entries = Object.create(null);
 
-  for (const file of listSourceFiles(dir)) {
+  for (const file of files.filter((candidate) => !isVariant(candidate))) {
     const content = fs.readFileSync(file);
-    const eligible = shouldCompress(file, content.length);
-    let smallest = null;
+    const key = toKey(dir, file);
+    const hash = sha256(content);
+    const known = previous?.files[key];
+    // Same content, same policy, same variants: the work is already done.
+    if (known && known.sha256 === hash && variantsMatch(file, known)) {
+      entries[key] = known;
+      summary.unchanged += 1;
+      continue;
+    }
 
-    for (const extension of variantExtensions) {
+    const eligible = shouldCompress(file, content.length);
+    const written = [];
+    let smallest = null;
+    for (const extension of VARIANT_EXTENSIONS) {
       const target = `${file}.${extension}`;
       const variant = eligible ? encoders[extension](content) : null;
       if (variant && variant.length < content.length) {
+        // Removed first: if the name is a symlink, writing would follow it to its target.
+        fs.rmSync(target, { force: true });
         fs.writeFileSync(target, variant);
+        written.push(extension);
         smallest = Math.min(smallest ?? Infinity, variant.length);
       } else {
         // A variant left over from an earlier build would be served in place of the
@@ -50,6 +83,7 @@ function precompress(dir) {
         fs.rmSync(target, { force: true });
       }
     }
+    entries[key] = { sha256: hash, size: content.length, variants: written };
 
     if (smallest === null) {
       summary.skipped += 1;
@@ -60,12 +94,19 @@ function precompress(dir) {
     }
   }
 
+  // Served as they are, so they are recorded but never compressed.
+  for (const file of wellKnownFiles) {
+    const content = fs.readFileSync(file);
+    entries[toKey(dir, file)] = { sha256: sha256(content), size: content.length, variants: [] };
+  }
+
+  writeManifest(dir, entries);
   return summary;
 }
 
-function formatSummary({ compressed, skipped, bytesBefore, bytesAfter }, dir) {
+function formatSummary({ compressed, skipped, unchanged, bytesBefore, bytesAfter }, dir) {
   return (
-    `Precompressed ${compressed} file(s), skipped ${skipped}: ` +
+    `Precompressed ${compressed} file(s), skipped ${skipped}, unchanged ${unchanged}: ` +
     `${bytesBefore} -> ${bytesAfter} bytes (best variant per file) in ${dir}`
   );
 }

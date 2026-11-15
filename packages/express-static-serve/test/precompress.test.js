@@ -129,6 +129,21 @@ describe("precompress", () => {
     assert.equal(fs.existsSync(path.join(served, "link.js.br")), false);
   });
 
+  test("does not write through a symlink that is named like a variant", () => {
+    const outside = write("outside/victim.txt", "must stay exactly as it is");
+    const served = path.join(workDir, "served");
+    fs.mkdirSync(served);
+    fs.writeFileSync(path.join(served, "app.js"), compressible);
+    fs.symlinkSync(outside, path.join(served, "app.js.br"));
+    precompress(served);
+    assert.equal(fs.readFileSync(outside, "utf8"), "must stay exactly as it is");
+    assert.equal(fs.lstatSync(path.join(served, "app.js.br")).isSymbolicLink(), false);
+    assert.equal(
+      zlib.brotliDecompressSync(fs.readFileSync(path.join(served, "app.js.br"))).toString(),
+      compressible
+    );
+  });
+
   test("reports what it did", () => {
     write("app.js", compressible);
     write("logo.png", compressible);
@@ -143,12 +158,136 @@ describe("precompress", () => {
   });
 });
 
+describe("precompress and the manifest", () => {
+  const manifestFile = () => path.join(workDir, ".dist-manifest.json");
+  const readManifestFile = () => JSON.parse(fs.readFileSync(manifestFile(), "utf8"));
+  // Sets a file's modification time far in the past, so that a rewrite is visible.
+  const OLD = new Date("2001-01-01T00:00:00Z");
+  const age = (file) => fs.utimesSync(file, OLD, OLD);
+  const mtime = (file) => fs.statSync(file).mtimeMs;
+
+  test("a first run writes a manifest that lists each source with its variants", () => {
+    write("app.js", compressible);
+    write("logo.png", compressible);
+    precompress(workDir);
+    const { files, version } = readManifestFile();
+    assert.equal(version, 1);
+    assert.deepEqual(Object.keys(files), ["app.js", "logo.png"]);
+    assert.deepEqual(files["app.js"].variants, ["br", "gz", "zz", "zst"]);
+    assert.equal(files["app.js"].size, Buffer.byteLength(compressible));
+    assert.deepEqual(files["logo.png"].variants, []);
+  });
+
+  test("a second run reports every file as unchanged and leaves the variants alone", () => {
+    const file = write("app.js", compressible);
+    write("logo.png", compressible);
+    precompress(workDir);
+    for (const ext of extensions) {
+      age(`${file}.${ext}`);
+    }
+    const second = precompress(workDir);
+    assert.deepEqual(
+      { compressed: second.compressed, skipped: second.skipped, unchanged: second.unchanged },
+      { compressed: 0, skipped: 0, unchanged: 2 }
+    );
+    for (const ext of extensions) {
+      assert.equal(mtime(`${file}.${ext}`), OLD.getTime(), `${ext} variant was rewritten`);
+    }
+  });
+
+  test("changing one source recompresses only that one", () => {
+    const changed = write("a.js", compressible);
+    const kept = write("b.js", compressible);
+    precompress(workDir);
+    age(`${kept}.br`);
+    age(`${changed}.br`);
+    fs.writeFileSync(changed, "const other = 1;\n".repeat(200));
+    const summary = precompress(workDir);
+    assert.equal(summary.compressed, 1);
+    assert.equal(summary.unchanged, 1);
+    assert.equal(mtime(`${kept}.br`), OLD.getTime());
+    assert.notEqual(mtime(`${changed}.br`), OLD.getTime());
+    const decoded = zlib.brotliDecompressSync(fs.readFileSync(`${changed}.br`));
+    assert.equal(decoded.toString(), "const other = 1;\n".repeat(200));
+  });
+
+  test("a deleted variant is written again", () => {
+    const file = write("app.js", compressible);
+    precompress(workDir);
+    fs.rmSync(`${file}.gz`);
+    const summary = precompress(workDir);
+    assert.equal(summary.compressed, 1);
+    assert.equal(fs.existsSync(`${file}.gz`), true);
+  });
+
+  test("a stray variant next to an unchanged source is removed", () => {
+    const file = write("noise.js", crypto.randomBytes(4096));
+    precompress(workDir);
+    fs.writeFileSync(`${file}.br`, "a variant nobody asked for");
+    precompress(workDir);
+    assert.equal(fs.existsSync(`${file}.br`), false);
+  });
+
+  test("a manifest written under another compression policy forces a full run", () => {
+    write("app.js", compressible);
+    precompress(workDir);
+    const manifest = readManifestFile();
+    fs.writeFileSync(manifestFile(), JSON.stringify({ ...manifest, policy: "another policy" }));
+    const summary = precompress(workDir);
+    assert.equal(summary.unchanged, 0);
+    assert.equal(summary.compressed, 1);
+    assert.notEqual(readManifestFile().policy, "another policy");
+  });
+
+  test("an unreadable or invalid manifest is replaced, not trusted", () => {
+    write("app.js", compressible);
+    fs.writeFileSync(manifestFile(), "{not json");
+    const summary = precompress(workDir);
+    assert.equal(summary.compressed, 1);
+    assert.equal(readManifestFile().version, 1);
+  });
+
+  test("dot entries get no variants and no manifest entry", () => {
+    write(".hidden.js", compressible);
+    write("sub/.also-hidden.js", compressible);
+    write("app.js", compressible);
+    precompress(workDir);
+    assert.equal(fs.existsSync(path.join(workDir, ".hidden.js.br")), false);
+    assert.equal(fs.existsSync(path.join(workDir, "sub", ".also-hidden.js.br")), false);
+    assert.deepEqual(Object.keys(readManifestFile().files), ["app.js"]);
+  });
+
+  test("a .well-known file is recorded and never compressed", () => {
+    write(".well-known/security.txt", compressible);
+    precompress(workDir);
+    assert.equal(fs.existsSync(path.join(workDir, ".well-known", "security.txt.br")), false);
+    const entry = readManifestFile().files[".well-known/security.txt"];
+    assert.deepEqual(entry.variants, []);
+    assert.equal(entry.size, Buffer.byteLength(compressible));
+  });
+
+  test("the manifest records a file named __proto__ like any other", () => {
+    write("__proto__", "x");
+    precompress(workDir);
+    assert.deepEqual(Object.keys(readManifestFile().files), ["__proto__"]);
+  });
+
+  test("two runs on the same content write the same manifest bytes", () => {
+    write("app.js", compressible);
+    precompress(workDir);
+    const first = fs.readFileSync(manifestFile(), "utf8");
+    precompress(workDir);
+    assert.equal(fs.readFileSync(manifestFile(), "utf8"), first);
+  });
+});
+
 describe("formatSummary", () => {
   test("describes the counts and byte totals for a directory", () => {
-    const summary = { compressed: 2, skipped: 1, bytesBefore: 100, bytesAfter: 10 };
+    const summary = { compressed: 2, skipped: 1, unchanged: 3, bytesBefore: 100, bytesAfter: 10 };
     assert.equal(
       formatSummary(summary, "/site/dist"),
-      "Precompressed 2 file(s), skipped 1: 100 -> 10 bytes (best variant per file) in /site/dist"
+      "Precompressed 2 file(s), skipped 1, unchanged 3: 100 -> 10 bytes " +
+        "(best variant per file) in /site/dist"
     );
   });
 });

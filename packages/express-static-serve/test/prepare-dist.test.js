@@ -29,6 +29,8 @@ describe("prepare-dist command line", () => {
     assert.equal(fs.existsSync(path.join(workDir, "index.html.br")), true);
     assert.match(result.stdout, /Precompressed 1 file\(s\)/);
     assert.match(result.stdout, /dist OK/);
+    assert.match(result.stdout, /dist CSP OK/);
+    assert.equal(fs.existsSync(path.join(workDir, ".dist-manifest.json")), true);
   });
 
   test("exits 1 when verification fails after compression", () => {
@@ -38,17 +40,26 @@ describe("prepare-dist command line", () => {
     assert.match(result.stderr, /index\.html/);
   });
 
-  // With no argument the script works on the package's real dist/, so this only runs when
-  // dist/ is absent, where it fails before writing anything.
-  test(
-    "defaults to the package dist directory when no argument is given",
-    { skip: fs.existsSync(path.join(__dirname, "..", "dist")) && "dist/ exists, would write" },
-    () => {
-      const result = spawnSync(process.execPath, [script], { encoding: "utf8" });
-      assert.equal(result.status, 1);
-      assert.match(result.stderr, /dist is not a directory/);
-    }
-  );
+  test("exits 1 for a page the CSP blocks, and still writes the variants and the manifest", () => {
+    write("index.html", page + "<script>alert(1)</script>\n");
+    const result = run(workDir);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /dist CSP verification failed/);
+    assert.match(result.stderr, /index\.html:61: inline <script>/);
+    assert.match(result.stdout, /dist OK/);
+    assert.equal(fs.existsSync(path.join(workDir, "index.html.br")), true);
+    assert.equal(fs.existsSync(path.join(workDir, ".dist-manifest.json")), true);
+  });
+
+  test("runs both checks even when the first one fails, so one run shows everything", () => {
+    write("other.html", page + "<script>alert(1)</script>\n");
+    const result = run(workDir);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /dist verification failed/);
+    assert.match(result.stderr, /missing required file: index\.html/);
+    assert.match(result.stderr, /dist CSP verification failed/);
+    assert.match(result.stderr, /other\.html:61: inline <script>/);
+  });
 
   test("exits 1 without verifying when the directory does not exist", () => {
     const result = run(path.join(workDir, "missing"));

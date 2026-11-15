@@ -19,10 +19,11 @@ permissions:
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       # Required by the `comment-summary-in-pr` option below. Granted at job level only, per
-      # the repo's workflow permissions policy (see CLAUDE.md, GitHub Actions policy).
+      # the repo's workflow permissions policy (see AGENTS.md, GitHub Actions policy).
       pull-requests: write
     steps:
       - name: "Checkout repository"

@@ -43,4 +43,4 @@ function shouldCompress(filePath, sizeBytes) {
   return sizeBytes >= MIN_SIZE_BYTES && COMPRESSIBLE_EXTENSIONS.has(extension);
 }
 
-module.exports = { shouldCompress, LEVELS };
+module.exports = { shouldCompress, LEVELS, MIN_SIZE_BYTES, COMPRESSIBLE_EXTENSIONS };

@@ -1,0 +1,78 @@
+---
+# Builds the Docker image, runs it locked down against a small dist/, and scans it for known
+# vulnerabilities. Nothing is pushed to a registry.
+name: Container
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "41 5 * * 2"
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the image
+        run: docker build --tag app-drawer:ci .
+
+      - name: Create a small dist/ to serve
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          printf '<!doctype html><title>ci</title><h1>ci</h1>\n' > "$RUNNER_TEMP/dist/index.html"
+          chmod -R a+rX "$RUNNER_TEMP/dist"
+
+      # Read-only root file system, no capabilities, no privilege escalation: the server needs
+      # none of them, and this proves it.
+      - name: Run the container locked down
+        run: |
+          docker run --detach --name app --init --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --publish 3000:3000 \
+            --volume "$RUNNER_TEMP/dist:/app/packages/express-static-serve/dist:ro" \
+            app-drawer:ci
+
+      - name: Wait for the image's own health check
+        run: |
+          for _ in $(seq 1 45); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' app)"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs app
+          exit 1
+
+      - name: Smoke test
+        run: |
+          test "$(curl --silent --fail http://127.0.0.1:3000/)" = '{"status":"UP"}'
+          curl --silent --fail --output /dev/null --dump-header "$RUNNER_TEMP/headers.txt" \
+            http://127.0.0.1:3000/index.html
+          grep --ignore-case '^content-security-policy:' "$RUNNER_TEMP/headers.txt"
+          grep --ignore-case '^cache-control: no-cache' "$RUNNER_TEMP/headers.txt"
+          test "$(docker exec app id -u)" = "1000"
+          docker exec app test ! -e /app/node_modules/pm2
+
+      - name: Stop gracefully
+        run: |
+          docker stop app
+          test "$(docker inspect --format '{{.State.ExitCode}}' app)" = "0"
+
+      # Fails on fixable HIGH or CRITICAL findings. The scanner image is pinned by digest and
+      # updated by hand (see AGENTS.md, GitHub Actions policy).
+      - name: Scan the image
+        run: |
+          docker run --rm --volume /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c image --exit-code 1 \
+            --severity HIGH,CRITICAL --ignore-unfixed app-drawer:ci

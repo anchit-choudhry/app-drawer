@@ -14,16 +14,63 @@ const instructions = (text) =>
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"));
 
+// Every file reached from `entry` through require("./...") or require("../...").
+function localModules(entry, seen = new Set()) {
+  if (seen.has(entry)) {
+    return seen;
+  }
+  seen.add(entry);
+  const source = fs.readFileSync(entry, "utf8");
+  for (const [, request] of source.matchAll(/require\("(\.{1,2}\/[^"]+)"\)/g)) {
+    localModules(require.resolve(path.resolve(path.dirname(entry), request)), seen);
+  }
+  return seen;
+}
+
+// The source paths of every COPY that takes files from the build context.
+function copiedPaths(lines) {
+  return lines
+    .filter((line) => line.startsWith("COPY ") && !line.includes("--from="))
+    .flatMap((line) => line.split(/\s+/).slice(1, -1))
+    .filter((part) => !part.startsWith("--"));
+}
+
 describe("Dockerfile", () => {
   const lines = instructions(readText("Dockerfile"));
   const nodeMajor = readText(".nvmrc").trim();
 
-  test("builds every stage on the Node major pinned in .nvmrc", () => {
+  test("builds every stage on the Node major pinned in .nvmrc, pinned by digest", () => {
     const stages = lines.filter((line) => line.startsWith("FROM "));
     assert.ok(stages.length >= 1);
     for (const stage of stages) {
-      assert.match(stage, new RegExp(`^FROM node:${nodeMajor}(-[a-z]+)?( AS \\w+)?$`));
+      const pinned = `^FROM node:${nodeMajor}-slim@sha256:[0-9a-f]{64}( AS \\w+)?$`;
+      assert.match(stage, new RegExp(pinned));
     }
+  });
+
+  test("every stage uses the same digest", () => {
+    const digests = lines
+      .filter((line) => line.startsWith("FROM "))
+      .map((line) => /@sha256:([0-9a-f]{64})/.exec(line)?.[1]);
+    assert.ok(digests.every(Boolean), "every stage must carry a digest");
+    assert.equal(new Set(digests).size, 1, `found ${[...new Set(digests)].join(", ")}`);
+  });
+
+  test("copies every local module the server loads", () => {
+    const packageDir = path.join(repoRoot, "packages", "express-static-serve");
+    const sources = copiedPaths(lines);
+    const missing = [...localModules(path.join(packageDir, "server.js"))]
+      .map((file) => path.relative(repoRoot, file).split(path.sep).join("/"))
+      .filter(
+        (file) => !sources.some((source) => file === source || file.startsWith(`${source}/`))
+      );
+    assert.deepEqual(missing, [], "these modules are loaded by the server but not copied");
+  });
+
+  test("installs no PM2 into the image: it is a root dependency, not the workspace's", () => {
+    const install = lines.find((line) => /^RUN npm ci /.test(line));
+    assert.match(install, /--workspace=express-static-serve/);
+    assert.match(install, /--omit=dev/);
   });
 
   test("installs production dependencies only, strictly from the lockfile", () => {

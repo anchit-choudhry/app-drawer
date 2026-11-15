@@ -1,0 +1,51 @@
+---
+# On a version tag: runs the tests, checks that the tag matches package.json, and creates a
+# GitHub release with a CycloneDX SBOM of the production dependencies attached.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Create the release
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies from the lockfile
+        run: npm ci
+
+      - name: Run tests with the coverage gate
+        run: npm run test:coverage --workspace=express-static-serve
+
+      - name: Check that the tag matches the package version
+        run: test "v$(node -p "require('./package.json').version")" = "$TAG"
+        env:
+          TAG: ${{ github.ref_name }}
+
+      - name: Write the SBOM
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cdx.json
+
+      - name: Create the release
+        run: gh release create "$TAG" sbom.cdx.json --verify-tag --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}

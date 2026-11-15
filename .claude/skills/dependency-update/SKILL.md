@@ -7,7 +7,7 @@ description: Checks for outdated npm dependencies across the app-drawer workspac
 
 # Dependency Update Skill
 
-Codifies the workflow already described in this repo's CLAUDE.md ("Security & Maintenance")
+Codifies the workflow already described in this repo's AGENTS.md ("Security and maintenance")
 into a repeatable process. Covers the npm workspace as a whole - there is only one package today
 (`express-static-serve`), but this runs from the repository root so it picks up new packages under
 `packages/*` automatically.
@@ -28,12 +28,12 @@ into a repeatable process. Covers the npm workspace as a whole - there is only o
    `min-release-age=7`, so releases under 7 days old are skipped; for an urgent security fix, add
    `--min-release-age=0` to that one command and tell the user why.
 6. **Audit**: Run `npm audit`. If vulnerabilities remain, run `npm audit fix` - never
-   `npm audit fix --force`, per CLAUDE.md. `braces` has no fix and is still installed through
-   `pm2`, though `npm audit` no longer reports it.
-7. **Review overrides**: The root `package.json` `overrides` (`js-yaml`, `basic-ftp`) exist only
-   because `pm2` pins vulnerable transitive versions (see CLAUDE.md, "Transitive vulnerability
-   overrides"). If the update moved `pm2`, check with `npm view pm2@<version> dependencies` and
-   `npm ls js-yaml basic-ftp` whether an override is no longer needed, and remove it if so.
+   `npm audit fix --force`, per AGENTS.md.
+7. **Review overrides**: There are none today (see AGENTS.md, "Transitive vulnerability
+   overrides"): `pm2` 7.1.1 pins `js-yaml` itself and no longer pulls in `braces` or `basic-ftp`.
+   If `npm audit` reports a transitive advisory, pin the fixed version under `overrides` in the
+   root `package.json` and apply it with `npm update <pkg>`. If the update moved `pm2`, check
+   with `npm ls js-yaml` that nothing needs an override it did not have before.
 8. **Verify**: Run `npm run test:coverage --workspace=express-static-serve` (the same gate CI
    uses), `npm run audit:signatures`, and `npm ci --dry-run` (confirms `package.json` and
    `package-lock.json` still agree). Then start the server locally

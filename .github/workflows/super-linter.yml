@@ -18,6 +18,7 @@ permissions:
 jobs:
   run-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       # super-linter reports each linter result as a commit status

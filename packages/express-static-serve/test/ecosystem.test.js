@@ -2,22 +2,21 @@ const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
-// A TRUST_PROXY exported in the developer's shell must not change what these tests load.
-delete process.env.TRUST_PROXY;
+const { clearConfigEnv, cleanEnv } = require("./helpers");
+// A variable exported in the developer's shell must not change what these tests load.
+clearConfigEnv();
 const { SHUTDOWN_TIMEOUT_MS } = require("../server");
 const ecosystem = require("../ecosystem.config");
 
 const [appConfig] = ecosystem.apps;
 const packageDir = path.join(__dirname, "..");
 
-// Loads ecosystem.config.js in a fresh process, as `pm2 start` does, with a chosen TRUST_PROXY.
-function loadEcosystem(trustProxy) {
-  const env = { ...process.env };
-  delete env.TRUST_PROXY;
-  if (trustProxy !== undefined) {
-    env.TRUST_PROXY = trustProxy;
-  }
-  const script = 'process.stdout.write(require("./ecosystem.config").apps[0].env.TRUST_PROXY)';
+// Loads ecosystem.config.js in a fresh process, as `pm2 start` does, with exactly the given
+// variables set, and prints the env block entry called `name`.
+function loadEcosystem(variables = {}, name = "TRUST_PROXY") {
+  const env = { ...cleanEnv(), ...variables };
+  const read = `require("./ecosystem.config").apps[0].env[${JSON.stringify(name)}]`;
+  const script = `process.stdout.write(${read})`;
   return spawnSync(process.execPath, ["-e", script], { cwd: packageDir, env, encoding: "utf8" });
 }
 
@@ -27,20 +26,54 @@ describe("PM2 worker environment", () => {
   });
 
   test("forwards TRUST_PROXY as 0 when it is unset", () => {
-    const result = loadEcosystem(undefined);
+    const result = loadEcosystem({});
     assert.equal(result.status, 0);
     assert.equal(result.stdout, "0");
   });
 
   test("forwards a valid TRUST_PROXY unchanged", () => {
-    assert.equal(loadEcosystem("2").stdout, "2");
+    assert.equal(loadEcosystem({ TRUST_PROXY: "2" }).stdout, "2");
   });
 
   test("refuses to load with a bad TRUST_PROXY, so pm2 stops before any worker starts", () => {
-    const result = loadEcosystem("true");
+    const result = loadEcosystem({ TRUST_PROXY: "true" });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /TRUST_PROXY/);
     assert.match(result.stderr, /"true"/);
+  });
+});
+
+describe("PM2 worker environment, every supported variable", () => {
+  test("forwards PORT as 3000 when it is unset", () => {
+    assert.equal(loadEcosystem({}, "PORT").stdout, "3000");
+  });
+
+  test("forwards a given PORT", () => {
+    assert.equal(loadEcosystem({ PORT: "8080" }, "PORT").stdout, "8080");
+  });
+
+  test("refuses to load with a bad PORT, naming the value", () => {
+    const result = loadEcosystem({ PORT: "abc" }, "PORT");
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Invalid PORT "abc"/);
+  });
+
+  test("forwards an unset KEEP_ALIVE_TIMEOUT_MS as an empty string", () => {
+    const result = loadEcosystem({}, "KEEP_ALIVE_TIMEOUT_MS");
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, "");
+  });
+
+  test("forwards every supported variable, and nothing the config does not know", () => {
+    const read = 'require("./ecosystem.config").apps[0].env';
+    const script = `process.stdout.write(JSON.stringify(Object.keys(${read})))`;
+    const result = spawnSync(process.execPath, ["-e", script], {
+      cwd: packageDir,
+      env: cleanEnv(),
+      encoding: "utf8",
+    });
+    const { ENV_NAMES } = require("../lib/config");
+    assert.deepEqual(JSON.parse(result.stdout), ["NODE_ENV", ...ENV_NAMES]);
   });
 });
 
