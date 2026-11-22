@@ -33,7 +33,8 @@ headers.
 - `.github/`: workflows, Dependabot, labeler, issue forms, pull request template, `CODEOWNERS`,
   and `SECURITY.md`.
 - `docs/`: `architecture.md`, `threat-model.md`, `runbook.md`, `adr/` (decision records), and
-  `superpowers/` (design specs and implementation plans for larger changes).
+  `superpowers/` (local design specs and implementation plans for larger changes; git-ignored,
+  never committed).
 
 ## Architecture
 
@@ -59,7 +60,12 @@ headers.
   `test/docs-drift.test.js` enforces the README part.
 - **Compression:** `express-static-gzip` matches pre-compressed variants by extension: `.zst`
   (Zstandard), `.br` (Brotli), `.gz` (Gzip), `.zz` (Deflate), in that order of preference.
-  A file with no variant is served as is.
+  A file with no variant is served as is. A URL whose percent-encoding changes the extension
+  (`app.abc123%2Ejs`) is served without a variant, because `express-static-gzip` would otherwise
+  send `Content-Type: false` under the file's cache policy; a wrapper around the mount in
+  `server.js` drops `Accept-Encoding` for it. The same wrapper marks the 400 that
+  `express-static-gzip` sends for a bad escape as `no-store`, since that answer skips the error
+  stage.
 - **Cache policy:** `lib/cache-policy.js` gives each file one of three policies, judged by name
   without the variant extension. HTML is `no-cache`. A name carrying a hex hash (8 or more hex
   characters after `.` or `-`, at least one digit and one letter `a` to `f`, then one or two
@@ -100,7 +106,9 @@ headers.
   leaves `GET /` and `HEAD /` out of the log.
 - **Graceful shutdown:** `SIGTERM` and `SIGINT` set the draining flag, wait out the grace period,
   and close the HTTP server, with a 10-second forced exit counted from the signal, so PM2 cluster
-  reloads do not drop in-flight requests.
+  reloads do not drop in-flight requests. `server.close()` ends only idle connections, so a
+  100 ms sweep of `closeIdleConnections()` also runs after it: a connection that was still sending
+  a response turns idle later and would otherwise wait out `KEEP_ALIVE_TIMEOUT_MS`.
 - **Trust proxy:** `app.set("trust proxy", ...)` takes the `TRUST_PROXY` variable, parsed by
   `parseTrustProxy` in `trust-proxy.js` through `lib/config.js`. It defaults to `0` (no proxy
   trusted); set the number of reverse proxy or CDN hops, from 0 to 10, and no more than the real
@@ -153,7 +161,9 @@ headers.
   someone who can also rewrite it. `verify-dist` fails on a missing manifest, a symlink (the
   server follows symlinks, which is why they are rejected), and a stray dot entry. `check-csp`
   is a regex lint of the HTML in `dist/` against `CSP_DIRECTIVES`; any finding fails
-  `prepare-dist`. `express-static-gzip` lists compressed variants once at startup, so after
+  `prepare-dist`. It runs in linear time, and a start tag it cannot parse (no closing `>`, or a
+  quote that never closes) is a finding of its own, because the scan stops there. `<!-->`,
+  `<!--->`, and `--!>` end a comment, as they do in a browser. `express-static-gzip` lists compressed variants once at startup, so after
   changing `dist/` run `prepare-dist` and reload the PM2 workers from the ecosystem file. The
   README section "Providing `dist/`" is the user-facing version.
 
@@ -221,7 +231,7 @@ Tests and checks:
   files carry the same version with `pm2` only in the root.
 - **Lockfile integrity:** if `package-lock.json` is missing `resolved` or `integrity` fields,
   `npm install` alone will not fix it while `node_modules` still exists; remove both first.
-- **Transitive vulnerability overrides:** none today. `pm2` 7.1.1 pins `js-yaml` 4.3.2 itself and
+- **Transitive vulnerability overrides:** none today. `pm2` 7.1.2 pins `js-yaml` 4.3.2 itself and
   no longer depends on `chokidar` (`braces`) or `proxy-agent` (`get-uri`, `basic-ftp`), so the
   `js-yaml` and `basic-ftp` overrides and the `braces` Trivy and OSV exceptions were removed on
   2026-10-31. If an advisory needs one again, pin the fixed version under `overrides` in the root
@@ -239,8 +249,10 @@ Tests and checks:
   `|| true`, so its findings fail the job.
 - **GitHub Actions policy:** every `uses:` is pinned to a full commit SHA with its tag in a
   trailing comment (Dependabot updates both), every workflow declares top-level `permissions:
-  contents: read` with wider grants only at job level, and every job has a `timeout-minutes`.
-  Every `actions/checkout` sets `persist-credentials: false`, and no `run:` script may contain a
+  contents: read` with wider grants only at job level, and every job that runs on a runner has a
+  `timeout-minutes` (a job that calls a reusable workflow, such as the two OSV Scanner jobs,
+  cannot take one). `release.yml` only releases a tag whose commit is on `main`, and does not use
+  the npm cache, because its job holds a write token. Every `actions/checkout` sets `persist-credentials: false`, and no `run:` script may contain a
   `${{ }}` expression: event fields and step outputs (an issue body, a model's reply) can be
   attacker-controlled, so pass them through `env:` and quote the variable. Every registry image
   used in a `run:` script is pinned by digest; the Trivy image in `container.yml` is updated by
@@ -255,7 +267,9 @@ Tests and checks:
 - **Linter config:** each linter reads a fixed file name from `.github/linters/`:
   `.markdown-lint.yml` (not `.markdownlint.yml`, which super-linter silently ignores),
   `.editorconfig-checker.json`, `.jscpd.json`, `.textlintrc`, `.codespellrc`, `.yaml-lint.yml`,
-  and `zizmor.yaml`. Prettier reads the root `.prettierrc.json` and `.prettierignore` (Markdown is
+  `zizmor.yaml`, and for Python (`.claude/lib/command_guard.py`) `.python-black`, `.ruff.toml`,
+  `.flake8`, and `.isort.cfg`, which all set the 100 character limit (the defaults are 88 for
+  Black and 120 for Ruff's formatter, which disagree). Prettier reads the root `.prettierrc.json` and `.prettierignore` (Markdown is
   ignored there). Biome is switched off in the workflow because it conflicts with Prettier and
   ESLint; setting `VALIDATE_<LINTER>: false` only disables that one.
 - **Run super-linter locally:** it needs Docker, an `amd64` image, and a clean tree because it

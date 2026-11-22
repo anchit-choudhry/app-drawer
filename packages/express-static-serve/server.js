@@ -17,13 +17,7 @@ const ALLOWED_METHODS = ["GET", "HEAD"];
 // Set for the file a static response was about to send. They describe that file, not the
 // error page that replaces it. Content-Type is on the list because render keeps a type that
 // is already set: without it, a failed .js file turns the error page into text/javascript.
-const FILE_HEADERS = [
-  "Content-Encoding",
-  "Content-Type",
-  "ETag",
-  "Last-Modified",
-  "Accept-Ranges",
-];
+const FILE_HEADERS = ["Content-Encoding", "Content-Type", "ETag", "Last-Modified", "Accept-Ranges"];
 
 // The static layer sets these before it knows whether it will send the file: a read can fail,
 // and a POST for an existing file falls through to the 404 stage. A page that takes the
@@ -42,6 +36,18 @@ function resetFileHeaders(res, { keepContentRange = false } = {}) {
 // its variant extension.
 function setCacheControl(res, filePath) {
   res.setHeader("Cache-Control", cacheControlFor(filePath));
+}
+
+// The text after the last dot or slash, which is what the `mime` package reads as the extension.
+const extensionOf = (urlPath) => urlPath.replace(/^.*[./\\]/, "").toLowerCase();
+
+// The decoded URL path, or null when it has a bad escape.
+function decodePath(rawPath) {
+  try {
+    return decodeURIComponent(rawPath);
+  } catch {
+    return null;
+  }
 }
 
 function errorHandler(err, req, res, next) {
@@ -101,20 +107,32 @@ function createApp(options = {}) {
     })
   );
 
-  app.use(
-    "/",
-    expressStaticGzip(distDir, {
-      enableBrotli: true,
-      customCompressions: [
-        { encodingName: "zstd", fileExtension: "zst" },
-        { encodingName: "deflate", fileExtension: "zz" },
-      ],
-      serveStatic: {
-        setHeaders: setCacheControl,
-      },
-      orderPreference: compressionOrder,
-    })
-  );
+  const compressedStatic = expressStaticGzip(distDir, {
+    enableBrotli: true,
+    customCompressions: [
+      { encodingName: "zstd", fileExtension: "zst" },
+      { encodingName: "deflate", fileExtension: "zz" },
+    ],
+    serveStatic: {
+      setHeaders: setCacheControl,
+    },
+    orderPreference: compressionOrder,
+  });
+  app.use("/", (req, res, next) => {
+    const decoded = decodePath(req.path);
+    if (decoded === null) {
+      // express-static-gzip answers a bad escape with a 400 of its own, outside the error stage,
+      // so mark it here as never cacheable, like every other error page.
+      res.set("Cache-Control", NO_STORE);
+    } else if (extensionOf(decoded) !== extensionOf(req.path)) {
+      // The extension changes when decoded, such as `app.abc123%2Ejs`. express-static-gzip finds
+      // the variant by the decoded path but reads the type from the raw one, which would send
+      // `Content-Type: false` under the file's cache policy. Serving the plain file lets send
+      // work out the type from the real name.
+      delete req.headers["accept-encoding"];
+    }
+    compressedStatic(req, res, next);
+  });
 
   // Still the 404 stage: nothing above answered. Only GET and HEAD can ever be served.
   app.use((req, res) => {
@@ -185,6 +203,10 @@ function createShutdown(app, server, config) {
       server.close(() => {
         process.exit(0);
       });
+      // close() ends only idle connections. One whose response was still being sent turns idle
+      // later and would wait out its keep-alive timeout, so keep sweeping until the server has
+      // closed. The timer is unref'd so it never keeps the process alive by itself.
+      setInterval(() => server.closeIdleConnections(), 100).unref();
     }, config.shutdownGraceMs);
     // Counted from the signal, so the grace period never extends the shutdown window.
     setTimeout(() => {

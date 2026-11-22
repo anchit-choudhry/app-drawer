@@ -7,7 +7,6 @@
       "Bash(git branch -d *)",
       "Bash(git check-ignore *)",
       "Bash(git diff *)",
-      "Bash(git fetch*)",
       "Bash(git log *)",
       "Bash(git show *)",
       "Bash(git status*)",
@@ -23,7 +22,12 @@
       "Bash(npm test*)",
       "Bash(npm run test:coverage*)",
       "Bash(npm run --silent audit:signatures)",
-      "Bash(npm view *)"
+      "Bash(npm view *)",
+      "Bash(git fetch)",
+      "Bash(awk 'length > 100 {print FILENAME\": \"FNR\": \"length}' *)",
+      "Bash(awk 'length > 100' *)",
+      "Bash(npm run audit:signatures)",
+      "Bash(docker buildx imagetools inspect *)"
     ],
     "deny": [
       "Bash(npm install --global *)",
@@ -32,7 +36,10 @@
       "Bash(sudo rm *)",
       "Bash(rm -rf /*)",
       "Bash(rm -rf ~*)",
-      "Bash(npm audit fix*--force*)"
+      "Bash(npm audit fix*--force*)",
+      "Bash(git * --out*)",
+      "Bash(git * --upload-pack*)",
+      "Bash(git * --receive-pack*)"
     ]
   },
   "hooks": {

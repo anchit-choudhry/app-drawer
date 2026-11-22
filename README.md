@@ -85,7 +85,8 @@ numbers stop the server and PM2 with an error that names the value, because Expr
 To change it, reload from the ecosystem file, which PM2 reads again:
 
 ```bash
-TRUST_PROXY=1 npx pm2 reload packages/express-static-serve/ecosystem.config.js --update-env
+TRUST_PROXY=1 npx --no-install pm2 reload \
+  packages/express-static-serve/ecosystem.config.js --update-env
 ```
 
 The file validates every variable with the same parser as the server and forwards all of them to
@@ -113,7 +114,7 @@ base image references in the `Dockerfile` are pinned by digest, and Dependabot p
 
 ```bash
 docker build -t app-drawer .
-docker run --init --read-only --cap-drop=ALL -p 3000:3000 \
+docker run --init --read-only --cap-drop=ALL --security-opt=no-new-privileges -p 3000:3000 \
   -v "$PWD/packages/express-static-serve/dist:/app/packages/express-static-serve/dist:ro" \
   app-drawer
 ```

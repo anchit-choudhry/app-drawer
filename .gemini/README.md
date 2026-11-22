@@ -30,10 +30,12 @@ from the repo, they represent core safety invariants for this project.
 - [warn-core-files.sh][core-files]: Provides reminders when editing core files like `server.js`.
 - [block-git-commit.sh][git-commit]: Blocks `git commit` from the agent session; the user manages
   commits.
-- [block-hook-edit.sh][hook-edit]: Blocks edits to `settings.json` and `hooks/*.sh`, so guardrails
-  cannot be weakened by the agent.
+- [block-hook-edit.sh][hook-edit]: Blocks edits to the settings files, the hooks, and the hook
+  libraries (`.claude/lib/`), so guardrails cannot be weakened by the agent.
 - [hook-input.sh][hook-input]: Shared helper that parses the hook JSON payload from stdin for the
-  hooks above.
+  hooks above. A guard hook blocks when it cannot read the payload.
+- `command_guard.py` (next to `hook-input.sh`): the command parser the three Bash guards share. It
+  reads separators, `bash -c`, `eval`, `$(...)`, wrappers, and a `cd` earlier in the command.
 
 ## Project Guidance
 

@@ -16,17 +16,19 @@ const escapeForLog = (text) =>
   text.replace(UNSAFE_IN_LOG, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
 function jsonLine(tokens, req, res) {
-  return escapeForLog(JSON.stringify({
-    time: tokens.date(req, res, "iso"),
-    remoteAddr: tokens["remote-addr"](req, res) ?? null,
-    method: req.method,
-    url: req.originalUrl || req.url,
-    status: number(tokens.status(req, res)),
-    bytes: number(tokens.res(req, res, "content-length")),
-    responseTimeMs: number(tokens["response-time"](req, res)),
-    referrer: req.headers.referer ?? req.headers.referrer ?? null,
-    userAgent: req.headers["user-agent"] ?? null,
-  }));
+  return escapeForLog(
+    JSON.stringify({
+      time: tokens.date(req, res, "iso"),
+      remoteAddr: tokens["remote-addr"](req, res) ?? null,
+      method: req.method,
+      url: req.originalUrl || req.url,
+      status: number(tokens.status(req, res)),
+      bytes: number(tokens.res(req, res, "content-length")),
+      responseTimeMs: number(tokens["response-time"](req, res)),
+      referrer: req.headers.referer ?? req.headers.referrer ?? null,
+      userAgent: req.headers["user-agent"] ?? null,
+    })
+  );
 }
 
 function isHealthCheck(req) {

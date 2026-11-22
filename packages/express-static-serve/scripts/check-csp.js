@@ -5,9 +5,14 @@ const { CSP_DIRECTIVES } = require("../lib/security-headers");
 const { listFiles, resolveDistDir, reportVerification } = require("./dist-common");
 
 const HTML_FILE = /\.html?$/i;
-const COMMENT = /<!--[\s\S]*?-->/g;
-// A start tag: its name, then attributes in which a quoted value may hold ">".
-const TAG_SOURCE = "<([a-zA-Z][^\\s/>]*)((?:\"[^\"]*\"|'[^']*'|[^'\">])*)>";
+const TAG_OPEN = /<[a-zA-Z]/g;
+// A start tag: its name, then attributes in which a quoted value may hold ">". The lookahead
+// after the name allows only one way to split name from attributes, which keeps a tag that never
+// closes from being retried at every length of its name.
+const TAG_SOURCE = "<([a-zA-Z][^\\s/>]*)(?=[\\s/>])((?:\"[^\"]*\"|'[^']*'|[^'\">])*)>";
+const UNPARSED_TAG = "start tag could not be parsed, the rest of the page was not checked";
+// What ends a comment: "-->", or "--!>", which a browser accepts too.
+const COMMENT_END = /--!?>/g;
 const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
 const HASH_SOURCE = /^'(sha256|sha384|sha512)-([A-Za-z0-9+/=_-]+)'$/;
 // Script types that hold data and are never run.
@@ -58,23 +63,80 @@ function parseAttributes(source) {
   return attributes;
 }
 
+// Where the comment that opens at `open` ends, or -1 when it never does. "<!-->" and "<!--->" are
+// complete comments in a browser, so the text after them is live markup.
+function commentEnd(html, open) {
+  const body = open + 4;
+  if (html.startsWith(">", body)) {
+    return body + 1;
+  }
+  if (html.startsWith("->", body)) {
+    return body + 2;
+  }
+  const ending = new RegExp(COMMENT_END);
+  ending.lastIndex = body;
+  const found = ending.exec(html);
+  return found === null ? -1 : found.index + found[0].length;
+}
+
+// Blanks every comment, not removes it, so that line numbers stay right. This is linear: a "<!--"
+// with no ending after it is left as it is, and then no later one can be closed either.
+function blankComments(html) {
+  const parts = [];
+  let from = 0;
+  for (;;) {
+    const open = html.indexOf("<!--", from);
+    const end = open === -1 ? -1 : commentEnd(html, open);
+    if (end === -1) {
+      break;
+    }
+    parts.push(html.slice(from, open), html.slice(open, end).replace(/[^\n]/g, " "));
+    from = end;
+  }
+  parts.push(html.slice(from));
+  return parts.join("");
+}
+
 // Yields every start tag with its attributes and line number. For script and style it also
 // yields the text inside, and skips over it so that markup inside code is not read as tags.
+// A start tag this scanner cannot parse (no closing ">", or a quote that never closes, which
+// includes an apostrophe inside an unquoted value that a browser would accept) ends the scan with
+// `{ unterminated: true, line }`, and the caller reports it. Trying every later "<" again would
+// make the cost grow with the square of the page.
 function* startTags(html) {
-  // Comments are blanked, not removed, so that line numbers stay right.
-  const text = html.replace(COMMENT, (comment) => comment.replace(/[^\n]/g, " "));
-  const pattern = new RegExp(TAG_SOURCE, "g");
-  let match;
-  while ((match = pattern.exec(text)) !== null) {
+  const text = blankComments(html);
+  const opening = new RegExp(TAG_OPEN);
+  const tag = new RegExp(TAG_SOURCE, "y");
+  let from = 0;
+  let line = 1;
+  // Each line break is found once, so counting lines never rescans the text before a tag.
+  let nextBreak = text.indexOf("\n");
+  for (;;) {
+    opening.lastIndex = from;
+    const found = opening.exec(text);
+    if (found === null) {
+      return;
+    }
+    while (nextBreak !== -1 && nextBreak < found.index) {
+      line += 1;
+      nextBreak = text.indexOf("\n", nextBreak + 1);
+    }
+    tag.lastIndex = found.index;
+    const match = tag.exec(text);
+    if (match === null) {
+      yield { unterminated: true, line };
+      return;
+    }
     const name = match[1].toLowerCase();
     let content = "";
+    from = tag.lastIndex;
     if (name === "script" || name === "style") {
-      const rest = text.slice(pattern.lastIndex);
-      const end = rest.search(new RegExp(`</${name}\\s*>`, "i"));
-      content = end === -1 ? rest : rest.slice(0, end);
-      pattern.lastIndex += content.length;
+      const closing = new RegExp(`</${name}\\s*>`, "gi");
+      closing.lastIndex = from;
+      const end = closing.exec(text);
+      content = text.slice(from, end === null ? text.length : end.index);
+      from += content.length;
     }
-    const line = text.slice(0, match.index).split("\n").length;
     yield { name, attributes: parseAttributes(match[2]), content, line };
   }
 }
@@ -166,7 +228,11 @@ function findingsFor(html, directives = CSP_DIRECTIVES) {
     findings.push(`${line}: ${what} (blocked by ${directive})`);
   };
 
-  for (const { name, attributes, content, line } of startTags(html)) {
+  for (const { name, attributes, content, line, unterminated } of startTags(html)) {
+    if (unterminated) {
+      findings.push(`${line}: ${UNPARSED_TAG}`);
+      break;
+    }
     for (const [tag, attribute, directive] of URL_RULES) {
       const url = tag === name ? attributes[attribute] : undefined;
       if (url && !urlAllowed(directives, directive, url)) {

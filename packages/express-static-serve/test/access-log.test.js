@@ -98,7 +98,7 @@ describe("json format and control characters", () => {
     // A client cannot send DEL in a header, but a raw socket can.
     assert.equal(escapeForLog("a\u007fb"), "a\\u007fb");
     assert.equal(escapeForLog("\u0080\u009f"), "\\u0080\\u009f");
-    assert.equal(escapeForLog("plain \"text\" \\ é"), "plain \"text\" \\ é");
+    assert.equal(escapeForLog('plain "text" \\ é'), 'plain "text" \\ é');
   });
 
   test("the line separators U+2028 and U+2029 are escaped too", async () => {

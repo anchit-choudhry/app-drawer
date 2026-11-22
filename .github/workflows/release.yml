@@ -22,12 +22,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The full history, so that the next step can tell whether the tag is on main.
+          fetch-depth: 0
 
+      - name: Check that the tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      # No npm cache here: this job holds a write token, and a poisoned cache entry would run in
+      # it. setup-node turns caching on by itself unless package-manager-cache is false.
       - name: Set up Node.js from .nvmrc
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: npm
+          package-manager-cache: false
 
       - name: Install dependencies from the lockfile
         run: npm ci

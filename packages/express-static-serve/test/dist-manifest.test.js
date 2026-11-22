@@ -28,10 +28,7 @@ const otherDir = () => fs.mkdtempSync(path.join(__dirname, ".tmp-manifest-"));
 
 describe("sha256 and toKey", () => {
   test("sha256 is the hex digest", () => {
-    assert.equal(
-      sha256("abc"),
-      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-    );
+    assert.equal(sha256("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });
 
   test("toKey is the path inside dist/ with forward slashes", () => {

@@ -1,6 +1,7 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 const zlib = require("node:zlib");
@@ -274,6 +275,40 @@ describe("shutdown", () => {
       server.child.kill("SIGKILL");
     }
   });
+
+  // server.close() only closes idle connections. A response still being sent when it runs keeps
+  // its connection open afterwards, and with a long keep-alive timeout that held the process
+  // until the forced exit (code 1).
+  test(
+    "a response still in flight when the server closes does not stall the exit",
+    { timeout: 20000 },
+    async () => {
+      const distDir = makeDist({ "big.bin": "x".repeat(32 * 1024 * 1024) });
+      const agent = new http.Agent({ keepAlive: true });
+      const server = await startServer({ distDir, env: { KEEP_ALIVE_TIMEOUT_MS: "30000" } });
+      try {
+        const res = await new Promise((resolve, reject) => {
+          const request = { host: "127.0.0.1", port: server.port, path: "/big.bin", agent };
+          http.get(request, resolve).on("error", reject);
+        });
+        // Nothing reads the body, so the server is still sending it when it closes.
+        res.pause();
+        server.child.kill("SIGTERM");
+        await waitForOutput(server, /Received SIGTERM/, "the shutdown line");
+        // SHUTDOWN_GRACE_MS is 0, so close() runs right after the log line.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const resumed = Date.now();
+        res.resume();
+        const result = await server.closed;
+        assert.equal(result.code, 0, `forced exit instead of a clean one:\n${server.stderr}`);
+        assert.ok(Date.now() - resumed < 5000, "the exit must not wait for the keep-alive timeout");
+      } finally {
+        agent.destroy();
+        server.child.kill("SIGKILL");
+        removeDir(distDir);
+      }
+    }
+  );
 
   // A missing dist/ only logs a warning, so this needs no fixture and runs even when a real
   // dist/ exists.

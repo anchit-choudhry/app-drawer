@@ -30,7 +30,7 @@ into a repeatable process. Covers the npm workspace as a whole - there is only o
 6. **Audit**: Run `npm audit`. If vulnerabilities remain, run `npm audit fix` - never
    `npm audit fix --force`, per AGENTS.md.
 7. **Review overrides**: There are none today (see AGENTS.md, "Transitive vulnerability
-   overrides"): `pm2` 7.1.1 pins `js-yaml` itself and no longer pulls in `braces` or `basic-ftp`.
+   overrides"): `pm2` 7.1.2 pins `js-yaml` itself and no longer pulls in `braces` or `basic-ftp`.
    If `npm audit` reports a transitive advisory, pin the fixed version under `overrides` in the
    root `package.json` and apply it with `npm update <pkg>`. If the update moved `pm2`, check
    with `npm ls js-yaml` that nothing needs an override it did not have before.

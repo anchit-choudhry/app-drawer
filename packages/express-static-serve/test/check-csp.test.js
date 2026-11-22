@@ -82,10 +82,7 @@ describe("findingsFor", () => {
 
   test("img-src extended with another origin removes the findings on lines 8 and 9", () => {
     const found = findingsFor(dirtyPage, withSources("img-src", "https://other.example"));
-    assert.deepEqual(
-      found.map(lineOf),
-      [2, 3, 4, 6, 7, 10, 11, 12, 13, 14, 15, 16]
-    );
+    assert.deepEqual(found.map(lineOf), [2, 3, 4, 6, 7, 10, 11, 12, 13, 14, 15, 16]);
   });
 
   test("the sha256 hash of alert(1) in script-src removes line 2 only", () => {
@@ -115,8 +112,64 @@ describe("findingsFor", () => {
   });
 
   test("ignores markup inside a comment but keeps the line numbers", () => {
-    const html = '<!--\n<script>alert(1)</script>\n-->\n<script>alert(2)</script>';
+    const html = "<!--\n<script>alert(1)</script>\n-->\n<script>alert(2)</script>";
     assert.deepEqual(findingsFor(html), ["4: inline <script> (blocked by script-src)"]);
+  });
+
+  // A start tag with no closing ">" used to be retried from every earlier "<", which made the
+  // cost grow with the cube of the input and could hang prepare-dist or VERIFY_DIST_ON_START.
+  // The bound is generous: a linear scan takes a few milliseconds.
+  function secondsToCheck(html) {
+    const start = performance.now();
+    findingsFor(html);
+    return (performance.now() - start) / 1000;
+  }
+
+  test("a page of unclosed start tags is checked in linear time", () => {
+    assert.ok(secondsToCheck("<a".repeat(1000)) < 1);
+    assert.ok(secondsToCheck("<a ".repeat(20000)) < 1);
+  });
+
+  test("a page of unclosed comments is checked in linear time", () => {
+    assert.ok(secondsToCheck("<!--".repeat(150000)) < 1);
+  });
+
+  const UNPARSED = "start tag could not be parsed, the rest of the page was not checked";
+
+  test("a start tag that cannot be parsed is a finding, not a silent skip", () => {
+    const found = findingsFor('<p>ok</p>\n<a href="x');
+    assert.deepEqual(found, [`2: ${UNPARSED}`]);
+  });
+
+  test("a start tag that cannot be parsed still reports the findings before it", () => {
+    const found = findingsFor("<script>alert(1)</script>\n<img src=");
+    assert.equal(found.length, 2);
+    assert.match(found[0], /^1: inline <script>/);
+    assert.match(found[1], /^2: start tag could not be parsed/);
+  });
+
+  // A browser accepts an apostrophe inside an unquoted value, but this scanner reads it as the
+  // start of a quoted one. The finding must not claim that a browser drops the tag.
+  test("an unmatched quote in an unquoted value says the tag could not be parsed", () => {
+    const found = findingsFor('<a href=/it\'s>x</a>\n<script src="https://evil/x.js"></script>');
+    assert.deepEqual(found, [`1: ${UNPARSED}`]);
+  });
+
+  // These are complete comments in a browser, so the script after them runs and must be found,
+  // even though a later "-->" exists that a scan for only that ending would pair with them.
+  for (const [name, comment] of [
+    ["<!-->", "<!-->"],
+    ["<!--->", "<!--->"],
+    ["a comment closed by --!>", "<!-- note --!>"],
+  ]) {
+    test(`${name} ends the comment`, () => {
+      const found = findingsFor(`${comment}\n<script src="https://evil/x.js"></script>\n-->`);
+      assert.deepEqual(found, ['2: <script src="https://evil/x.js"> (blocked by script-src)']);
+    });
+  }
+
+  test("markup inside a comment that is closed later is still ignored", () => {
+    assert.deepEqual(findingsFor('<!-- <script src="https://evil/x.js"></script> -->'), []);
   });
 });
 

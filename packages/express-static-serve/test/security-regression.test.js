@@ -9,6 +9,7 @@ const { httpRequest, listenLocal } = require("./helpers");
 
 const MARKER = "TOP-SECRET-MARKER";
 const page = "<!doctype html><title>site</title>\n".repeat(60);
+const SCRIPT = "console.log('app');\n".repeat(200);
 
 let root;
 let site;
@@ -33,6 +34,7 @@ before(async () => {
   fs.writeFileSync(path.join(root, "secret.txt"), MARKER);
   fs.writeFileSync(path.join(site, "index.html"), page);
   fs.writeFileSync(path.join(site, "hello.txt"), "hello world");
+  fs.writeFileSync(path.join(site, "app.abcdef12.js"), SCRIPT);
   fs.writeFileSync(path.join(site, "sub", "index.html"), page);
   fs.writeFileSync(path.join(site, ".well-known", "security.txt"), "Contact: x\n");
   precompress(site);
@@ -107,6 +109,45 @@ describe("reflected input", () => {
       assert.doesNotMatch(res.body, /<script>alert\(1\)/);
     });
   }
+});
+
+// express-static-gzip finds a variant by the decoded path but reads the type from the raw one, so
+// a percent-encoded extension used to give `Content-Type: false` next to the immutable policy,
+// which a cache that normalizes the URL could then serve for the real file name.
+describe("percent-encoded file extensions", () => {
+  const gzip = { headers: { "accept-encoding": "gzip" } };
+
+  test("the plain name is served compressed with a JavaScript type", async () => {
+    const res = await send("/app.abcdef12.js", gzip);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers["content-encoding"], "gzip");
+    assert.match(res.headers["content-type"], /^text\/javascript/);
+  });
+
+  for (const urlPath of ["/app.abcdef12%2Ejs", "/app.abcdef12.%6As", "/app.abcdef12.%6as"]) {
+    test(`${urlPath} never answers with a broken Content-Type`, async () => {
+      const res = await send(urlPath, gzip);
+      assert.equal(res.status, 200);
+      assert.match(res.headers["content-type"], /^text\/javascript/);
+      assert.equal(res.headers["content-encoding"], undefined);
+      assert.equal(res.body, SCRIPT);
+    });
+  }
+
+  // express-static-gzip answers a path that does not decode with a 400 of its own, outside the
+  // error stage, so the response must still be marked as never cacheable.
+  test("a path with a bad escape answers 400 and is never cached", async () => {
+    const res = await send("/%E0%A4%A", gzip);
+    assert.equal(res.status, 400);
+    assert.equal(res.headers["cache-control"], "no-store");
+  });
+
+  test("an encoded character outside the extension keeps the compressed response", async () => {
+    const res = await send("/app%2Eabcdef12.js", gzip);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers["content-encoding"], "gzip");
+    assert.match(res.headers["content-type"], /^text\/javascript/);
+  });
 });
 
 describe("methods", () => {

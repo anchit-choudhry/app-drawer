@@ -1,3 +1,7 @@
 # Prettier reflows hand-wrapped prose and splits inline code spans across lines. markdownlint and
 # EditorConfig already cover Markdown structure and line length, so Markdown is left alone.
 *.md
+
+# Written by test/response-headers.test.js with JSON.stringify, so a Prettier layout would be
+# undone by the next UPDATE_SNAPSHOTS=1 run.
+packages/express-static-serve/test/fixtures/response-headers.json

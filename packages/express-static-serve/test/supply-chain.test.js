@@ -261,8 +261,7 @@ describe("GitHub workflows", () => {
       }))
       .filter(({ runners, timeouts }) => runners !== timeouts)
       .map(
-        ({ file, runners, timeouts }) =>
-          `${file}: ${runners} runs-on, ${timeouts} timeout-minutes`
+        ({ file, runners, timeouts }) => `${file}: ${runners} runs-on, ${timeouts} timeout-minutes`
       );
     assert.deepEqual(mismatched, []);
   });

@@ -21,15 +21,24 @@ repository. The shared guidance for every agent lives in `AGENTS.md`, which is i
 - **Hook input:** hooks read the PreToolUse JSON from stdin through `.claude/lib/hook-input.sh`
   (`HOOK_COMMAND`, `HOOK_FILE_PATH`). Never read `CLAUDE_TOOL_INPUT`: Claude Code does not set it,
   so a hook that does is a silent no-op. Block messages go to stderr with exit 2. Test a hook by
-  piping JSON into it. Hooks match against the whole command text, so a command that merely
-  mentions a blocked pattern (for example in an `echo`) is blocked too. Claude never sees stdout
+  piping JSON into it. The three Bash guards parse the command in `.claude/lib/command_guard.py`:
+  it reads `;`, `&&`, `|`, `bash -c`, `eval`, `$(...)`, backticks, wrappers such as `sudo` and
+  `env`, git's global options, and a `cd` earlier in the same command. Text inside quotes is not
+  a command, but unquoted words are, so `echo git commit` is still blocked. It is a guardrail, not
+  a sandbox: a command assembled at run time (base64, a variable that holds a command) cannot be
+  read, and the permission prompt stays the control for those. A hook that cannot read its input
+  (no `python3`, a payload that is not JSON) blocks instead of passing. Claude never sees stdout
   or stderr from a PreToolUse hook that exits 0, so a reminder (`warn-core-files.sh`) is printed
   as JSON with `hookSpecificOutput.additionalContext` instead.
 - **Protected files:** `block-hook-edit.sh` blocks Edit/Write on `.claude/settings.json`,
-  `.gemini/settings.json`, and `hooks/*.sh`. Describe the exact change and the user applies it;
-  `.claude/lib/` is deliberately outside that glob. `block-git-commit.sh` likewise blocks
-  `git commit` from the session, which enforces the commit safety rule in `AGENTS.md`.
-  `block-rm-outside-repo.sh` blocks `rm` on anything that resolves outside the repository.
+  `.claude/settings.local.json`, everything under `.claude/hooks/` and `.claude/lib/`, and the
+  `.gemini` equivalents, ignoring case and resolving `..` and symbolic links. Describe the exact
+  change and the user applies it. `block-git-commit.sh` likewise blocks `git commit` from the
+  session (also `commit-tree` and a `-c alias.x=commit` alias), which enforces the commit safety
+  rule in `AGENTS.md`. `block-rm-outside-repo.sh` blocks `rm`, `rmdir`, `unlink`, `shred`, and
+  `find -delete` on anything that resolves outside the repository, or cannot be resolved (an unset
+  variable, `cd "$X"`). `block-dangerous-git.sh` blocks a force push to `main` or `master` or with
+  no branch named, `--mirror`, `reset --hard`, `clean -f`, and `branch -D`, in any flag spelling.
 - **Personal sound hook:** `.claude/hooks/notification-alert.sh` plays a macOS sound on
   notifications. It is git-ignored and registered in the git-ignored `.claude/settings.local.json`,
   not in the shared `settings.json`; the same script step creates that registration.

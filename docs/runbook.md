@@ -25,8 +25,12 @@ A reload from the ecosystem file applies only the file's `env` block. A variable
 exported on the reload goes back to its default, so export every non-default value each time:
 
 ```bash
-LOG_FORMAT=json TRUST_PROXY=1 npx pm2 reload packages/express-static-serve/ecosystem.config.js
+LOG_FORMAT=json TRUST_PROXY=1 \
+  npx --no-install pm2 reload packages/express-static-serve/ecosystem.config.js
 ```
+
+`--no-install` makes the command fail instead of downloading PM2 when `npm ci` has not been run, so
+the version always comes from the lockfile.
 
 A bad value stops the reload in the terminal and leaves the running workers alone. Never reload
 by app name with `--update-env`: it skips the file and hands the shell environment to the workers.
@@ -34,7 +38,7 @@ by app name with `--update-env`: it skips the file and hands the shell environme
 ## Run in Docker
 
 ```bash
-docker run --init --read-only --cap-drop=ALL -p 3000:3000 \
+docker run --init --read-only --cap-drop=ALL --security-opt=no-new-privileges -p 3000:3000 \
   -v "$PWD/packages/express-static-serve/dist:/app/packages/express-static-serve/dist:ro" \
   app-drawer
 ```
@@ -52,15 +56,15 @@ are served uncompressed.
 
 ## Symptoms
 
-| Symptom                                   | Likely cause and fix                                          |
-| ----------------------------------------- | ------------------------------------------------------------- |
-| Every path except `GET /` answers 404     | `dist/` is missing or empty; check the startup warning        |
-| Files are served uncompressed             | No manifest, or files added after `prepare-dist`; run it again |
-| "Refused to..." in the browser console    | The CSP blocked something; run `check-csp` on `dist/`         |
-| `GET /` answers 503 `DRAINING`            | The server is shutting down; see `SHUTDOWN_GRACE_MS`          |
-| The server exits at start with "Invalid"  | A bad variable; the message names it and the accepted values  |
-| PM2 workers in the `errored` state        | Reloaded by app name with `--update-env`; reload from the file |
-| A new page does not show                  | HTML is `no-cache`, so look at the CDN or proxy in front      |
+| Symptom | Likely cause and fix |
+| --- | --- |
+| Every path except `GET /` answers 404 | `dist/` is missing or empty; check the startup warning |
+| Files are served uncompressed | No manifest, or files added after `prepare-dist`; run it again |
+| "Refused to..." in the browser console | The CSP blocked something; run `check-csp` on `dist/` |
+| `GET /` answers 503 `DRAINING` | The server is shutting down; see `SHUTDOWN_GRACE_MS` |
+| The server exits at start with "Invalid" | A bad variable; the message names it and the accepted values |
+| PM2 workers in the `errored` state | Reloaded by app name with `--update-env`; reload from the file |
+| A new page does not show | HTML is `no-cache`, so look at the CDN or proxy in front |
 
 ## See also
 

@@ -55,20 +55,20 @@ finding fails the command. The server never runs the build.
 
 ## Modules
 
-| Module                         | Role                                                            |
-| ------------------------------ | --------------------------------------------------------------- |
-| `server.js`                    | `createApp()` builds the app, `start()` parses and listens       |
-| `lib/config.js`                | Strict parsing of every environment variable                    |
-| `lib/security-headers.js`      | Helmet, the single `CSP_DIRECTIVES`, `Permissions-Policy`       |
-| `lib/cache-policy.js`          | `Cache-Control` per file name                                   |
-| `lib/access-log.js`            | Morgan setup, the JSON format, escaping of log values           |
-| `trust-proxy.js`               | The `TRUST_PROXY` parser                                        |
-| `ecosystem.config.js`          | PM2 cluster mode and the forwarded environment                  |
-| `scripts/precompress.js`       | Writes the variants and the manifest                            |
-| `scripts/verify-dist.js`       | Checks layout, variants, symlinks, dot entries, manifest        |
-| `scripts/check-csp.js`         | Regex lint of the HTML against `CSP_DIRECTIVES`                 |
-| `scripts/prepare-dist.js`      | Runs the three scripts above in order                           |
-| `views/`                       | The 404, 405, and 500 pages                                     |
+| Module | Role |
+| --- | --- |
+| `server.js` | `createApp()` builds the app, `start()` parses and listens |
+| `lib/config.js` | Strict parsing of every environment variable |
+| `lib/security-headers.js` | Helmet, the single `CSP_DIRECTIVES`, `Permissions-Policy` |
+| `lib/cache-policy.js` | `Cache-Control` per file name |
+| `lib/access-log.js` | Morgan setup, the JSON format, escaping of log values |
+| `trust-proxy.js` | The `TRUST_PROXY` parser |
+| `ecosystem.config.js` | PM2 cluster mode and the forwarded environment |
+| `scripts/precompress.js` | Writes the variants and the manifest |
+| `scripts/verify-dist.js` | Checks layout, variants, symlinks, dot entries, manifest |
+| `scripts/check-csp.js` | Regex lint of the HTML against `CSP_DIRECTIVES` |
+| `scripts/prepare-dist.js` | Runs the three scripts above in order |
+| `views/` | The 404, 405, and 500 pages |
 
 ## See also
 

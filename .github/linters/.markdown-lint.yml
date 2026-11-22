@@ -30,6 +30,10 @@ MD026:
 # MD029/ol-prefix: lazy (1. 1. 1.) and sequential numbering are both used.
 MD029: false
 
+# MD041/first-line-heading: the pull request template starts at "## What changed" on purpose.
+# GitHub shows it inside the pull request description, where an H1 would be oversized.
+MD041: false
+
 # MD033/no-inline-html
 MD033: false
 
